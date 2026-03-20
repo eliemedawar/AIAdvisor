@@ -14,7 +14,7 @@ interface UseAdvisorChatState {
   sending: boolean;
   applyingActions: boolean;
   error: string | null;
-  sendMessage: (content: string) => Promise<void>;
+  sendMessage: (content: string, attachedContext?: string) => Promise<void>;
   retryLastMessage: () => Promise<void>;
   clearError: () => void;
   clearConversation: () => Promise<void>;
@@ -59,13 +59,13 @@ export const useAdvisorChat = (): UseAdvisorChatState => {
     void init();
   }, []);
 
-  const sendMessage = async (content: string) => {
+  const sendMessage = async (content: string, attachedContext?: string) => {
     if (!conversation || !content.trim()) return;
     if (proposedActions.length > 0) return; // wait for user confirmation
     setSending(true);
     setError(null);
     try {
-      const res = await advisorApi.sendMessage(conversation.id, content);
+      const res = await advisorApi.sendMessage(conversation.id, content, attachedContext);
       setMessages((prev) => [...prev, ...res.messages]);
       setProposedActions(res.proposed_actions ?? []);
       setActionPlanConfidence(res.action_plan_confidence);
@@ -78,11 +78,18 @@ export const useAdvisorChat = (): UseAdvisorChatState => {
   };
 
   const retryLastMessage = async () => {
-    // Find the last user message and retry it
-    const lastUserMessage = [...messages].reverse().find(msg => msg.role === "user");
-    if (lastUserMessage) {
-      await sendMessage(lastUserMessage.content);
-    }
+    // Find the last user message; remove it and the subsequent assistant message
+    // from local state before retrying so we don't get duplicates.
+    const reversed = [...messages].reverse();
+    const lastUserIdx = reversed.findIndex((msg) => msg.role === "user");
+    if (lastUserIdx === -1) return;
+    const lastUserMessage = reversed[lastUserIdx];
+    // Drop the last user message and any assistant messages that came after it
+    setMessages((prev) => {
+      const userMsgIdx = prev.findLastIndex((m) => m.id === lastUserMessage.id);
+      return userMsgIdx === -1 ? prev : prev.slice(0, userMsgIdx);
+    });
+    await sendMessage(lastUserMessage.content);
   };
 
   const clearError = () => {

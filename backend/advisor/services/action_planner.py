@@ -23,9 +23,24 @@ logger = logging.getLogger(__name__)
 
 
 def _extract_outer_json(text: str) -> str | None:
-    """Extract the outermost {...} JSON object from a string."""
+    """Extract the outermost {...} JSON object from a string.
+
+    Tries json.loads on the whole text first (handles clean LLM output), then
+    falls back to brace-counting extraction for text wrapped in prose/code fences.
+    """
     if not text:
         return None
+    # Fast path: try stripping code fences then parsing directly
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        lines = stripped.splitlines()
+        stripped = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+    try:
+        json.loads(stripped)
+        return stripped
+    except (json.JSONDecodeError, ValueError):
+        pass
+    # Fallback: brace-counting (handles JSON embedded in prose)
     start = text.find("{")
     if start == -1:
         return None
@@ -65,6 +80,7 @@ def run_action_planner(
     conversation_summary: str,
     request_id: str | None = None,
     user_timezone: str | None = None,
+    attached_context: str | None = None,
 ) -> ActionPlanOutput:
     """
     Ask the LLM for proposed actions (assignment/calendar event creations).
@@ -105,10 +121,16 @@ def run_action_planner(
         f"says '11 PM Tuesday', output '2026-03-24T23:00:00+02:00', NOT '...T23:00:00Z')."
     )
 
+    attached_section = (
+        f"\nUser-highlighted context:\n{attached_context.strip()}\n"
+        if attached_context and attached_context.strip()
+        else ""
+    )
     planner_input = (
         f"Conversation summary:\n{conversation_summary}\n\n"
         f"Recent conversation (last {len(recent_turns)} messages):\n{recent_transcript}\n\n"
-        f"Student context:\n{context_text}\n\n"
+        f"Student context:\n{context_text}\n"
+        f"{attached_section}\n"
         f"Current date (server): {current_date_iso}\n"
         f"Current datetime (server): {current_datetime_iso}\n"
         f"{tz_instruction}\n\n"
@@ -120,7 +142,7 @@ def run_action_planner(
         ACTION_PLANNER_SYSTEM_PROMPT,
         [HumanMessage(content=planner_input)],
         request_id=request_id,
-        max_tokens=500,
+        max_tokens=1000,
     )
 
     text = (raw or "").strip()

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from calendar import day_name
 from collections import defaultdict
 from datetime import timedelta
 
+from django.db.models import Count
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.response import Response
@@ -16,11 +16,6 @@ from planner.serializers import (
     TaskSerializer,
 )
 from profiles.models import StudentProfile
-
-
-def _weekday_abbrev(dt):
-    """Return Mon, Tue, ... for a date."""
-    return day_name[dt.weekday()][:3]
 
 
 class DashboardOverviewView(APIView):
@@ -42,12 +37,13 @@ class DashboardOverviewView(APIView):
         profile = StudentProfile.objects.filter(user=user).first()
         current_gpa = float(profile.current_gpa) if profile and profile.current_gpa is not None else None
 
-        # Upcoming assignments (deadlines)
+        # Upcoming assignments (deadlines) — exclude completed ones
         upcoming_deadlines_qs = (
             Assignment.objects.filter(
                 course__user=user,
                 due_at__gte=now,
             )
+            .exclude(status="done")
             .select_related("course")
             .order_by("due_at")[:5]
         )
@@ -84,7 +80,6 @@ class DashboardOverviewView(APIView):
         gpa_trend = []
         if current_gpa is not None:
             for i in range(8, 0, -1):
-                week_start = now - timedelta(weeks=i)
                 gpa_trend.append({
                     "label": f"Week {9 - i}",
                     "gpa": round(current_gpa, 2),
@@ -97,8 +92,8 @@ class DashboardOverviewView(APIView):
         week_start = now - timedelta(days=now.weekday())
         week_end = week_start + timedelta(days=7)
         day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-        planned_by_day = defaultdict(int)
-        completed_by_day = defaultdict(int)
+        planned_by_day: dict[str, int] = defaultdict(int)
+        completed_by_day: dict[str, int] = defaultdict(int)
         tasks_this_week = Task.objects.filter(
             user=user,
             due_at__isnull=False,
@@ -117,14 +112,18 @@ class DashboardOverviewView(APIView):
             for d in day_names
         ]
 
-        # Study time by course: no tracking model yet; use assignment count per course as proxy or empty
-        courses_qs = Course.objects.filter(user=user)
-        study_time_by_course = []
-        for c in courses_qs[:10]:
-            count = Assignment.objects.filter(course=c).count()
-            if count > 0:
-                study_time_by_course.append({"courseName": c.name, "hours": count * 2})
-        study_time_by_course = study_time_by_course[:5]
+        # Study time by course: use a single annotated query to avoid N+1.
+        # Proxy: assignment_count × 2h (no real study-tracking model yet).
+        courses_with_counts = (
+            Course.objects.filter(user=user)
+            .annotate(assignment_count=Count("assignments"))
+            .filter(assignment_count__gt=0)
+            .order_by("-assignment_count")[:5]
+        )
+        study_time_by_course = [
+            {"courseName": c.name, "hours": c.assignment_count * 2}
+            for c in courses_with_counts
+        ]
 
         data = {
             "current_gpa": current_gpa,

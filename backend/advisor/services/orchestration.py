@@ -166,6 +166,7 @@ def get_advisor_reply_payload(
     *,
     request_id: str | None = None,
     user_timezone: str | None = None,
+    attached_context: str | None = None,
 ) -> dict[str, Any]:
     """
     Produce assistant reply plus a proposed action plan (confirmation-first).
@@ -203,20 +204,23 @@ def get_advisor_reply_payload(
         )
         if run_clarifier_step:
             # If we must ask a clarifying question, we should not propose writes.
-            clarifier_out = run_clarifier(
-                messages,
-                conversation_summary,
-                request_id=request_id,
-            )
-            if (
-                clarifier_out.action == "ask_question"
-                and clarifier_out.question
-                and clarifier_out.question.strip()
-            ):
-                return {
-                    "reply_text": clarifier_out.question.strip(),
-                    "proposed_actions": [],
-                }
+            try:
+                clarifier_out = run_clarifier(
+                    messages,
+                    conversation_summary,
+                    request_id=request_id,
+                )
+                if (
+                    clarifier_out.action == "ask_question"
+                    and clarifier_out.question
+                    and clarifier_out.question.strip()
+                ):
+                    return {
+                        "reply_text": clarifier_out.question.strip(),
+                        "proposed_actions": [],
+                    }
+            except Exception as e:
+                logger.warning("clarifier failed, continuing: %s", e, extra=log_extra)
 
         # Run agents in parallel; collect in router order for deterministic merge
         replies: dict[str, str] = {}
@@ -232,6 +236,7 @@ def get_advisor_reply_payload(
                 messages,
                 request_id=request_id,
                 conversation_summary=conversation_summary,
+                attached_context=attached_context,
             )
             return agent_name, reply
 
@@ -311,7 +316,33 @@ def get_advisor_reply_payload(
             "include",
             "insert",
         ]
+        # Affirmative short replies the user types to confirm a prior AI suggestion.
+        affirmative_keywords = [
+            "yes",
+            "yeah",
+            "yep",
+            "yup",
+            "sure",
+            "ok",
+            "okay",
+            "do it",
+            "go ahead",
+            "add it",
+            "sounds good",
+            "please",
+            "confirm",
+            "approved",
+            "agree",
+            "great",
+        ]
         has_write_intent = any(k in last_user_lower for k in write_keywords)
+        # Also treat a short affirmative reply as write intent when the recent
+        # conversation window already contains write-intent keywords — this
+        # covers the common "yes" / "ok" confirmation pattern.
+        if not has_write_intent:
+            is_affirmative = any(k in last_user_lower for k in affirmative_keywords)
+            recent_has_write_intent = any(k in recent_window for k in write_keywords)
+            has_write_intent = is_affirmative and recent_has_write_intent
 
         def _has_date_in(text: str) -> bool:
             return bool(
@@ -347,6 +378,7 @@ def get_advisor_reply_payload(
                 conversation_summary=conversation_summary,
                 request_id=request_id,
                 user_timezone=user_timezone,
+                attached_context=attached_context,
             )
             action_plan_confidence = action_plan.confidence
             proposed_actions = (

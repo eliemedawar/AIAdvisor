@@ -21,6 +21,7 @@ export interface Message {
 export type AssignmentType = "homework" | "project" | "exam" | "quiz" | "other";
 export type AssignmentStatus = "pending" | "in_progress" | "done";
 export type EventType = "exam" | "class" | "study_session" | "other";
+export type TaskPriority = "low" | "medium" | "high";
 
 export type ProposedAction =
   | {
@@ -41,6 +42,15 @@ export type ProposedAction =
       end_at: string;
       event_type: EventType;
       course_code: string | null;
+    }
+  | {
+      type: "create_task";
+      title: string;
+      description: string | null;
+      due_at: string | null;
+      priority: TaskPriority;
+      status: AssignmentStatus;
+      course_code: string | null;
     };
 
 export interface SendMessageResponse {
@@ -54,6 +64,7 @@ export interface ApplyActionsResponse {
   created: {
     assignment_ids: number[];
     event_ids: number[];
+    task_ids: number[];
   };
 }
 
@@ -81,12 +92,17 @@ export const advisorApi = {
 
   async sendMessage(
     conversationId: number,
-    content: string
+    content: string,
+    attachedContext?: string,
   ): Promise<SendMessageResponse> {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const { data } = await httpClient.post<SendMessageResponse>(
       `/advisor/conversations/${conversationId}/messages/`,
-      { content, timezone }
+      {
+        content,
+        timezone,
+        ...(attachedContext ? { attached_context: attachedContext } : {}),
+      }
     );
     return data;
   },

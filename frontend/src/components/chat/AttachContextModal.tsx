@@ -17,7 +17,7 @@ interface SelectedContext {
 interface AttachContextModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAttach: (context: SelectedContext) => void;
+  onAttach: (formattedContext: string, ids: SelectedContext) => void;
 }
 
 /**
@@ -83,13 +83,39 @@ export const AttachContextModal = ({ isOpen, onClose, onAttach }: AttachContextM
   };
 
   const handleAttach = () => {
-    onAttach(selected);
+    // Build a human-readable context string from the selected items
+    const lines: string[] = ["User-highlighted context:"];
+    if (selected.courses.length > 0) {
+      const names = courses
+        .filter((c) => selected.courses.includes(c.id))
+        .map((c) => `${c.code} – ${c.name}`)
+        .join(", ");
+      lines.push(`Courses: ${names}`);
+    }
+    if (selected.assignments.length > 0) {
+      const names = assignments
+        .filter((a) => selected.assignments.includes(a.id))
+        .map((a) => `${a.title} (due ${new Date(a.due_at).toLocaleDateString()}, ${a.status})`)
+        .join(", ");
+      lines.push(`Assignments: ${names}`);
+    }
+    if (selected.tasks.length > 0) {
+      const names = tasks
+        .filter((t) => selected.tasks.includes(t.id))
+        .map((t) => `${t.title} (${t.priority} priority${t.due_at ? ", due " + new Date(t.due_at).toLocaleDateString() : ""})`)
+        .join(", ");
+      lines.push(`Tasks: ${names}`);
+    }
+    const formattedContext = lines.join("\n");
+    onAttach(formattedContext, selected);
     setSelected({ courses: [], assignments: [], tasks: [] });
     setSearchQuery("");
     onClose();
   };
 
   const handleClose = () => {
+    // Reset selection so stale selections don't persist across opens
+    setSelected({ courses: [], assignments: [], tasks: [] });
     setSearchQuery("");
     onClose();
   };

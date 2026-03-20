@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, BookOpen, FileText, CheckSquare, AlertCircle, Check } from "lucide-react";
+import { Plus, BookOpen, FileText, CheckSquare, AlertCircle, Check, Pencil, Trash2 } from "lucide-react";
 import {
   PageShell,
   PageSection,
@@ -31,6 +31,7 @@ export const PlannerPage = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [completingId, setCompletingId] = useState<number | null>(null);
   const [showDone, setShowDone] = useState(false);
+  const [showDoneTasks, setShowDoneTasks] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -55,7 +56,7 @@ export const PlannerPage = () => {
     void load();
   }, []);
 
-  // Add Course modal
+  // ── Add Course modal ──────────────────────────────────────────────────────
   const [courseOpen, setCourseOpen] = useState(false);
   const [courseName, setCourseName] = useState("");
   const [courseCode, setCourseCode] = useState("");
@@ -80,7 +81,7 @@ export const PlannerPage = () => {
       setCourseCode("");
       setCourseTerm("");
       setCourseCredits("");
-      load();
+      void load();
     } catch (err: any) {
       showError("Failed to add course", err?.response?.data?.detail || "Please try again.");
     } finally {
@@ -88,7 +89,60 @@ export const PlannerPage = () => {
     }
   };
 
-  // Add Assignment modal
+  // ── Edit Course modal ─────────────────────────────────────────────────────
+  const [editCourseOpen, setEditCourseOpen] = useState(false);
+  const [editCourse, setEditCourse] = useState<Course | null>(null);
+  const [editCourseName, setEditCourseName] = useState("");
+  const [editCourseCode, setEditCourseCode] = useState("");
+  const [editCourseTerm, setEditCourseTerm] = useState("");
+  const [editCourseCredits, setEditCourseCredits] = useState<string>("");
+  const [savingEditCourse, setSavingEditCourse] = useState(false);
+  const [deletingCourseId, setDeletingCourseId] = useState<number | null>(null);
+
+  const openEditCourse = (c: Course) => {
+    setEditCourse(c);
+    setEditCourseName(c.name);
+    setEditCourseCode(c.code);
+    setEditCourseTerm(c.term);
+    setEditCourseCredits(c.credits != null ? String(c.credits) : "");
+    setEditCourseOpen(true);
+  };
+
+  const handleUpdateCourse = async () => {
+    if (!editCourse || !editCourseName.trim() || !editCourseCode.trim() || !editCourseTerm.trim()) return;
+    setSavingEditCourse(true);
+    try {
+      await plannerApi.updateCourse(editCourse.id, {
+        name: editCourseName.trim(),
+        code: editCourseCode.trim(),
+        term: editCourseTerm.trim(),
+        credits: editCourseCredits.trim() ? Number(editCourseCredits) : null,
+      });
+      showSuccess("Course updated", editCourseCode.trim());
+      setEditCourseOpen(false);
+      void load();
+    } catch (err: any) {
+      showError("Failed to update course", err?.response?.data?.detail || "Please try again.");
+    } finally {
+      setSavingEditCourse(false);
+    }
+  };
+
+  const handleDeleteCourse = async (id: number) => {
+    setDeletingCourseId(id);
+    try {
+      await plannerApi.deleteCourse(id);
+      showSuccess("Course deleted", "Course and its assignments were removed.");
+      setEditCourseOpen(false);
+      void load();
+    } catch (err: any) {
+      showError("Failed to delete", err?.response?.data?.detail || "Please try again.");
+    } finally {
+      setDeletingCourseId(null);
+    }
+  };
+
+  // ── Add Assignment modal ──────────────────────────────────────────────────
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignCourse, setAssignCourse] = useState("");
   const [assignTitle, setAssignTitle] = useState("");
@@ -119,7 +173,7 @@ export const PlannerPage = () => {
       setAssignDesc("");
       setAssignDue("");
       setAssignWeight("");
-      load();
+      void load();
     } catch (err: any) {
       showError("Failed to add assignment", err?.response?.data?.detail || "Please try again.");
     } finally {
@@ -127,7 +181,21 @@ export const PlannerPage = () => {
     }
   };
 
-  // Add Task modal
+  // ── Mark assignment done ──────────────────────────────────────────────────
+  const handleCompleteAssignment = async (id: number) => {
+    setCompletingId(id);
+    try {
+      await plannerApi.updateAssignment(id, { status: "done" });
+      setAssignments((prev) => prev.map((a) => a.id === id ? { ...a, status: "done" } : a));
+      showSuccess("Assignment completed", "Marked as done.");
+    } catch {
+      showError("Failed to complete", "Please try again.");
+    } finally {
+      setCompletingId(null);
+    }
+  };
+
+  // ── Add Task modal ────────────────────────────────────────────────────────
   const [taskOpen, setTaskOpen] = useState(false);
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDesc, setTaskDesc] = useState("");
@@ -155,11 +223,78 @@ export const PlannerPage = () => {
       setTaskDesc("");
       setTaskDue("");
       setTaskAssignment("");
-      load();
+      void load();
     } catch (err: any) {
       showError("Failed to add task", err?.response?.data?.detail || "Please try again.");
     } finally {
       setSavingTask(false);
+    }
+  };
+
+  // ── Edit Task modal ───────────────────────────────────────────────────────
+  const [editTaskOpen, setEditTaskOpen] = useState(false);
+  const [editTask, setEditTask] = useState<Task | null>(null);
+  const [editTaskTitle, setEditTaskTitle] = useState("");
+  const [editTaskDesc, setEditTaskDesc] = useState("");
+  const [editTaskDue, setEditTaskDue] = useState("");
+  const [editTaskPriority, setEditTaskPriority] = useState<"low" | "medium" | "high">("medium");
+  const [savingEditTask, setSavingEditTask] = useState(false);
+  const [deletingTaskId, setDeletingTaskId] = useState<number | null>(null);
+  const [completingTaskId, setCompletingTaskId] = useState<number | null>(null);
+
+  const openEditTask = (t: Task) => {
+    setEditTask(t);
+    setEditTaskTitle(t.title);
+    setEditTaskDesc(t.description || "");
+    setEditTaskDue(t.due_at ? t.due_at.slice(0, 16) : "");
+    setEditTaskPriority(t.priority);
+    setEditTaskOpen(true);
+  };
+
+  const handleUpdateTask = async () => {
+    if (!editTask || !editTaskTitle.trim()) return;
+    setSavingEditTask(true);
+    try {
+      await plannerApi.updateTask(editTask.id, {
+        title: editTaskTitle.trim(),
+        description: editTaskDesc.trim(),
+        due_at: editTaskDue ? new Date(editTaskDue).toISOString() : null,
+        priority: editTaskPriority,
+      });
+      showSuccess("Task updated", editTaskTitle.trim());
+      setEditTaskOpen(false);
+      void load();
+    } catch (err: any) {
+      showError("Failed to update task", err?.response?.data?.detail || "Please try again.");
+    } finally {
+      setSavingEditTask(false);
+    }
+  };
+
+  const handleDeleteTask = async (id: number) => {
+    setDeletingTaskId(id);
+    try {
+      await plannerApi.deleteTask(id);
+      showSuccess("Task deleted", "Task has been removed.");
+      setEditTaskOpen(false);
+      void load();
+    } catch (err: any) {
+      showError("Failed to delete", err?.response?.data?.detail || "Please try again.");
+    } finally {
+      setDeletingTaskId(null);
+    }
+  };
+
+  const handleCompleteTask = async (id: number) => {
+    setCompletingTaskId(id);
+    try {
+      await plannerApi.updateTask(id, { status: "done" });
+      setTasks((prev) => prev.map((t) => t.id === id ? { ...t, status: "done" } : t));
+      showSuccess("Task completed", "Marked as done.");
+    } catch {
+      showError("Failed to complete", "Please try again.");
+    } finally {
+      setCompletingTaskId(null);
     }
   };
 
@@ -188,22 +323,12 @@ export const PlannerPage = () => {
     );
   }
 
-  const handleCompleteAssignment = async (id: number) => {
-    setCompletingId(id);
-    try {
-      await plannerApi.updateAssignment(id, { status: "done" });
-      setAssignments((prev) => prev.map((a) => a.id === id ? { ...a, status: "done" } : a));
-      showSuccess("Assignment completed", "Marked as done.");
-    } catch {
-      showError("Failed to complete", "Please try again.");
-    } finally {
-      setCompletingId(null);
-    }
-  };
-
   const courseById = Object.fromEntries(courses.map((c) => [c.id, c]));
   const visibleAssignments = showDone ? assignments : assignments.filter((a) => a.status !== "done");
-  const doneCount = assignments.filter((a) => a.status === "done").length;
+  const doneAssignCount = assignments.filter((a) => a.status === "done").length;
+  const visibleTasks = tasks.filter((t) => t.status !== "done");
+  const doneTaskCount = tasks.filter((t) => t.status === "done").length;
+  const displayedTasks = showDoneTasks ? tasks : visibleTasks;
 
   return (
     <PageShell>
@@ -216,7 +341,7 @@ export const PlannerPage = () => {
             </Text>
           </header>
 
-          {/* Courses */}
+          {/* ── Courses ──────────────────────────────────────────────────── */}
           <Card variant="elevated">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
@@ -245,24 +370,32 @@ export const PlannerPage = () => {
                       <p className="font-medium text-slate-100">{c.code} – {c.name}</p>
                       <p className="text-xs text-slate-400">{c.term}{c.credits != null ? ` · ${c.credits} cr` : ""}</p>
                     </div>
+                    <button
+                      onClick={() => openEditCourse(c)}
+                      title="Edit course"
+                      className="ml-3 flex-shrink-0 flex items-center gap-1 rounded-lg border border-slate-700/60 px-2.5 py-1.5 text-xs text-slate-400 hover:border-primary-600/60 hover:text-primary-400 transition-colors"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Edit
+                    </button>
                   </div>
                 ))
               )}
             </div>
           </Card>
 
-          {/* Assignments */}
+          {/* ── Assignments ──────────────────────────────────────────────── */}
           <Card variant="elevated">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
                 <FileText className="h-5 w-5 text-primary-400" />
                 <Heading level="h2" className="text-lg">Assignments</Heading>
-                {doneCount > 0 && (
+                {doneAssignCount > 0 && (
                   <button
                     onClick={() => setShowDone((v) => !v)}
                     className="ml-1 rounded-full px-2 py-0.5 text-xs text-slate-400 border border-slate-700/60 hover:text-slate-200 hover:border-slate-600 transition-colors"
                   >
-                    {showDone ? "Hide done" : `+${doneCount} done`}
+                    {showDone ? "Hide done" : `+${doneAssignCount} done`}
                   </button>
                 )}
               </div>
@@ -315,19 +448,27 @@ export const PlannerPage = () => {
             </div>
           </Card>
 
-          {/* Tasks */}
+          {/* ── Tasks ────────────────────────────────────────────────────── */}
           <Card variant="elevated">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
                 <CheckSquare className="h-5 w-5 text-primary-400" />
                 <Heading level="h2" className="text-lg">Tasks</Heading>
+                {doneTaskCount > 0 && (
+                  <button
+                    onClick={() => setShowDoneTasks((v) => !v)}
+                    className="ml-1 rounded-full px-2 py-0.5 text-xs text-slate-400 border border-slate-700/60 hover:text-slate-200 hover:border-slate-600 transition-colors"
+                  >
+                    {showDoneTasks ? "Hide done" : `+${doneTaskCount} done`}
+                  </button>
+                )}
               </div>
               <Button size="sm" icon={<Plus className="h-4 w-4" />} onClick={() => setTaskOpen(true)}>
                 Add Task
               </Button>
             </div>
             <div className="mt-4 space-y-2">
-              {tasks.length === 0 ? (
+              {displayedTasks.length === 0 ? (
                 <EmptyState
                   icon={<CheckSquare className="h-8 w-8" />}
                   title="No tasks yet"
@@ -335,26 +476,54 @@ export const PlannerPage = () => {
                   action={<Button size="sm" variant="primary" onClick={() => setTaskOpen(true)}>Add task</Button>}
                 />
               ) : (
-                tasks.map((t) => (
-                  <div
-                    key={t.id}
-                    className="flex items-center justify-between rounded-xl border border-slate-800/60 bg-slate-900/30 px-4 py-3"
-                  >
-                    <div>
-                      <p className="font-medium text-slate-100">{t.title}</p>
-                      <p className="text-xs text-slate-400">
-                        {t.due_at ? `Due ${new Date(t.due_at).toLocaleDateString()}` : "No due date"} · {t.priority}
-                      </p>
-                    </div>
-                  </div>
-                ))
+                <AnimatePresence initial={false}>
+                  {displayedTasks.map((t) => (
+                    <motion.div
+                      key={t.id}
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.18 }}
+                      className="overflow-hidden"
+                    >
+                      <div className={`flex items-center justify-between rounded-xl border px-4 py-3 ${t.status === "done" ? "border-slate-800/30 bg-slate-900/10 opacity-50" : "border-slate-800/60 bg-slate-900/30"}`}>
+                        <div className="min-w-0 flex-1">
+                          <p className={`font-medium ${t.status === "done" ? "line-through text-slate-400" : "text-slate-100"}`}>{t.title}</p>
+                          <p className="text-xs text-slate-400">
+                            {t.due_at ? `Due ${new Date(t.due_at).toLocaleDateString()}` : "No due date"} · {t.priority} priority
+                          </p>
+                        </div>
+                        <div className="ml-3 flex flex-shrink-0 items-center gap-1.5">
+                          {t.status !== "done" && (
+                            <button
+                              onClick={() => handleCompleteTask(t.id)}
+                              disabled={completingTaskId === t.id}
+                              title="Mark as done"
+                              className="flex items-center gap-1 rounded-lg border border-slate-700/60 px-2.5 py-1.5 text-xs text-slate-400 hover:border-emerald-600/60 hover:text-emerald-400 transition-colors disabled:opacity-50"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                              {completingTaskId === t.id ? "Saving…" : "Done"}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => openEditTask(t)}
+                            title="Edit task"
+                            className="flex items-center gap-1 rounded-lg border border-slate-700/60 px-2.5 py-1.5 text-xs text-slate-400 hover:border-primary-600/60 hover:text-primary-400 transition-colors"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               )}
             </div>
           </Card>
         </PageSection>
       </motion.div>
 
-      {/* Add Course Modal */}
+      {/* ── Add Course Modal ──────────────────────────────────────────────── */}
       <Modal
         isOpen={courseOpen}
         onClose={() => !savingCourse && setCourseOpen(false)}
@@ -377,7 +546,38 @@ export const PlannerPage = () => {
         </div>
       </Modal>
 
-      {/* Add Assignment Modal */}
+      {/* ── Edit Course Modal ─────────────────────────────────────────────── */}
+      <Modal
+        isOpen={editCourseOpen}
+        onClose={() => !savingEditCourse && setEditCourseOpen(false)}
+        title="Edit Course"
+        size="sm"
+        footer={
+          <>
+            <button
+              onClick={() => editCourse && handleDeleteCourse(editCourse.id)}
+              disabled={savingEditCourse || deletingCourseId !== null}
+              className="mr-auto flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-red-400 border border-red-800/40 hover:bg-red-950/30 transition-colors disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {deletingCourseId ? "Deleting…" : "Delete"}
+            </button>
+            <Button variant="ghost" size="sm" onClick={() => setEditCourseOpen(false)} disabled={savingEditCourse}>Cancel</Button>
+            <Button variant="primary" size="sm" onClick={handleUpdateCourse} loading={savingEditCourse} disabled={!editCourseName.trim() || !editCourseCode.trim() || !editCourseTerm.trim()}>
+              Save
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Input label="Course name" value={editCourseName} onChange={(e) => setEditCourseName(e.target.value)} placeholder="e.g. Data Structures" required />
+          <Input label="Code" value={editCourseCode} onChange={(e) => setEditCourseCode(e.target.value)} placeholder="e.g. CS 301" required />
+          <Input label="Term" value={editCourseTerm} onChange={(e) => setEditCourseTerm(e.target.value)} placeholder="e.g. Fall 2024" required />
+          <Input label="Credits (optional)" type="number" value={editCourseCredits} onChange={(e) => setEditCourseCredits(e.target.value)} placeholder="3" />
+        </div>
+      </Modal>
+
+      {/* ── Add Assignment Modal ──────────────────────────────────────────── */}
       <Modal
         isOpen={assignOpen}
         onClose={() => !savingAssign && setAssignOpen(false)}
@@ -421,7 +621,7 @@ export const PlannerPage = () => {
         </div>
       </Modal>
 
-      {/* Add Task Modal */}
+      {/* ── Add Task Modal ────────────────────────────────────────────────── */}
       <Modal
         isOpen={taskOpen}
         onClose={() => !savingTask && setTaskOpen(false)}
@@ -458,6 +658,49 @@ export const PlannerPage = () => {
             {assignments.map((a) => (
               <option key={a.id} value={a.id}>{a.title}</option>
             ))}
+          </Select>
+        </div>
+      </Modal>
+
+      {/* ── Edit Task Modal ───────────────────────────────────────────────── */}
+      <Modal
+        isOpen={editTaskOpen}
+        onClose={() => !savingEditTask && setEditTaskOpen(false)}
+        title="Edit Task"
+        size="sm"
+        footer={
+          <>
+            <button
+              onClick={() => editTask && handleDeleteTask(editTask.id)}
+              disabled={savingEditTask || deletingTaskId !== null}
+              className="mr-auto flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-red-400 border border-red-800/40 hover:bg-red-950/30 transition-colors disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {deletingTaskId ? "Deleting…" : "Delete"}
+            </button>
+            <Button variant="ghost" size="sm" onClick={() => setEditTaskOpen(false)} disabled={savingEditTask}>Cancel</Button>
+            <Button variant="primary" size="sm" onClick={handleUpdateTask} loading={savingEditTask} disabled={!editTaskTitle.trim()}>
+              Save
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Input label="Title" value={editTaskTitle} onChange={(e) => setEditTaskTitle(e.target.value)} placeholder="e.g. Review chapter 5" required />
+          <Input label="Description" value={editTaskDesc} onChange={(e) => setEditTaskDesc(e.target.value)} placeholder="Optional" />
+          <div>
+            <label className="mb-1 block text-xs font-medium text-slate-400">Due date (optional)</label>
+            <input
+              type="datetime-local"
+              value={editTaskDue}
+              onChange={(e) => setEditTaskDue(e.target.value)}
+              className="w-full rounded-xl border border-slate-700/80 bg-slate-900/60 px-4 py-2.5 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-primary-500/50"
+            />
+          </div>
+          <Select label="Priority" value={editTaskPriority} onChange={(e) => setEditTaskPriority(e.target.value as "low" | "medium" | "high")}>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
           </Select>
         </div>
       </Modal>

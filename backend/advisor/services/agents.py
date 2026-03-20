@@ -51,9 +51,12 @@ def _build_system_prompt(
     agent_name: str,
     *,
     conversation_summary: str | None = None,
+    attached_context: str | None = None,
 ) -> str:
     context_block = format_context_for_agent(context, agent_name)
     base = f"{prefix}\n\n--- Student context ---\n{context_block}"
+    if attached_context and attached_context.strip():
+        base += f"\n\n--- User-highlighted context ---\n{attached_context.strip()}"
     if conversation_summary:
         base = f"Conversation summary:\n{conversation_summary}\n\n{base}"
     return base
@@ -65,6 +68,7 @@ def run_scheduling_agent(
     *,
     request_id: str | None = None,
     conversation_summary: str | None = None,
+    attached_context: str | None = None,
 ) -> str:
     """Scheduling specialist: deadlines, calendar, assignments, tasks, time management."""
     logger.info(
@@ -76,6 +80,7 @@ def run_scheduling_agent(
         context,
         "scheduling",
         conversation_summary=conversation_summary,
+        attached_context=attached_context,
     )
     chat = _conversation_to_messages(messages)
     return call_llm(system, chat, request_id=request_id)
@@ -87,6 +92,7 @@ def run_advisor_agent(
     *,
     request_id: str | None = None,
     conversation_summary: str | None = None,
+    attached_context: str | None = None,
 ) -> str:
     """Advisor specialist: general advice, study tips, motivation, goals, GPA."""
     logger.info(
@@ -98,6 +104,7 @@ def run_advisor_agent(
         context,
         "advisor",
         conversation_summary=conversation_summary,
+        attached_context=attached_context,
     )
     chat = _conversation_to_messages(messages)
     return call_llm(system, chat, request_id=request_id)
@@ -109,6 +116,7 @@ def run_course_progress_agent(
     *,
     request_id: str | None = None,
     conversation_summary: str | None = None,
+    attached_context: str | None = None,
 ) -> str:
     """Course/progress specialist: courses, credits, grades, on-track."""
     logger.info(
@@ -120,6 +128,7 @@ def run_course_progress_agent(
         context,
         "course_progress",
         conversation_summary=conversation_summary,
+        attached_context=attached_context,
     )
     chat = _conversation_to_messages(messages)
     return call_llm(system, chat, request_id=request_id)

@@ -64,8 +64,12 @@ class ConversationMessagesView(APIView):
             content=content,
         )
         user_timezone = request.data.get("timezone") or None
+        attached_context = request.data.get("attached_context") or None
         payload = get_advisor_reply_payload(
-            request.user, conversation, user_timezone=user_timezone
+            request.user,
+            conversation,
+            user_timezone=user_timezone,
+            attached_context=attached_context,
         )
         reply_content = payload.get("reply_text") or "I'm sorry, I couldn't generate a response right now."
         proposed_actions = payload.get("proposed_actions", [])
@@ -129,6 +133,7 @@ class ConversationApplyActionsView(APIView):
                 "created": {
                     "assignment_ids": exec_result.created_assignment_ids,
                     "event_ids": exec_result.created_event_ids,
+                    "task_ids": exec_result.created_task_ids,
                 },
             },
             status=status.HTTP_201_CREATED,

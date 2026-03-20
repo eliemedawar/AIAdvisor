@@ -34,7 +34,8 @@ interface UseDeadlineRemindersState {
   requestPermission: () => Promise<void>;
 }
 
-const STORAGE_KEY = "advisor_reminders_read_at";
+/** IDs of assignments the user has explicitly dismissed from the badge */
+const ACKNOWLEDGED_KEY = "advisor_acknowledged_ids";
 const CHECK_INTERVAL_MS = 5 * 60 * 1000; // re-check every 5 minutes
 const NOTIFIED_KEY = "advisor_notified_ids"; // track already-notified assignment IDs
 
@@ -47,20 +48,24 @@ function getUrgency(dueAt: Date, now: Date): DeadlineUrgency | null {
   return null; // more than 7 days away — skip
 }
 
-function getNotifiedIds(): Set<number> {
+function getStoredIds(key: string): Set<number> {
   try {
-    const raw = localStorage.getItem(NOTIFIED_KEY);
+    const raw = localStorage.getItem(key);
     return new Set(raw ? (JSON.parse(raw) as number[]) : []);
   } catch {
     return new Set();
   }
 }
 
-function saveNotifiedIds(ids: Set<number>) {
+function saveStoredIds(key: string, ids: Set<number>) {
   try {
-    localStorage.setItem(NOTIFIED_KEY, JSON.stringify([...ids]));
+    localStorage.setItem(key, JSON.stringify([...ids]));
   } catch {}
 }
+
+// Keep alias for readability at call sites
+const getNotifiedIds = () => getStoredIds(NOTIFIED_KEY);
+const saveNotifiedIds = (ids: Set<number>) => saveStoredIds(NOTIFIED_KEY, ids);
 
 function fireNotification(item: DeadlineItem) {
   if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
@@ -139,14 +144,14 @@ export const useDeadlineReminders = (): UseDeadlineRemindersState => {
 
     setDeadlines(items);
 
-    // Unread = items added after the last "mark all read" timestamp
-    const lastRead = Number(localStorage.getItem(STORAGE_KEY) ?? "0");
-    const unread = items.filter(
-      (i) => i.urgency === "overdue" || i.urgency === "today" || i.urgency === "soon"
-    ).length;
-    // Only show badge for urgent items the user hasn't acknowledged
-    const hasNewSinceRead = Date.now() - lastRead > 60_000; // reset badge after 1 min
-    setUnreadCount(hasNewSinceRead ? unread : 0);
+    // Unread badge: urgent items whose IDs are NOT in the acknowledged set.
+    // Once the user clicks "mark all read", those IDs are saved persistently.
+    const acknowledged = getStoredIds(ACKNOWLEDGED_KEY);
+    const urgentIds = items
+      .filter((i) => i.urgency === "overdue" || i.urgency === "today" || i.urgency === "soon")
+      .map((i) => i.id);
+    const unread = urgentIds.filter((id) => !acknowledged.has(id)).length;
+    setUnreadCount(unread);
 
     // Fire browser notifications for newly urgent items
     if (typeof Notification !== "undefined" && Notification.permission === "granted") {
@@ -172,7 +177,15 @@ export const useDeadlineReminders = (): UseDeadlineRemindersState => {
   }, []);
 
   const markAllRead = () => {
-    localStorage.setItem(STORAGE_KEY, String(Date.now()));
+    // Persist the IDs of all currently visible deadlines as acknowledged.
+    // New deadlines that appear later (different IDs) will still show the badge.
+    const existing = getStoredIds(ACKNOWLEDGED_KEY);
+    const currentIds = deadlines.map((d) => d.id);
+    const merged = new Set([...existing, ...currentIds]);
+    // Prune IDs that are no longer in scope (past 7-day window) to avoid unbounded growth.
+    const activeIds = new Set(deadlines.map((d) => d.id));
+    const pruned = new Set([...merged].filter((id) => activeIds.has(id) || existing.has(id)));
+    saveStoredIds(ACKNOWLEDGED_KEY, pruned);
     setUnreadCount(0);
   };
 

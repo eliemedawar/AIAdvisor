@@ -8,12 +8,13 @@ from typing import Any
 from django.db import transaction
 from django.utils import timezone
 
-from planner.models import Assignment, CalendarEvent, Course
+from planner.models import Assignment, CalendarEvent, Course, Task
 
 from .types import (
     ActionPlanInput,
     CreateAssignmentAction,
     CreateCalendarEventAction,
+    CreateTaskAction,
 )
 
 
@@ -43,6 +44,7 @@ def _parse_optional_decimal(value: Any) -> Decimal | None:
 class ExecutionResult:
     created_assignment_ids: list[int]
     created_event_ids: list[int]
+    created_task_ids: list[int]
     assistant_lines: list[str]
 
 
@@ -63,6 +65,7 @@ def execute_action_plan(
         return ExecutionResult(
             created_assignment_ids=[],
             created_event_ids=[],
+            created_task_ids=[],
             assistant_lines=["No valid planner/calendar actions to apply."],
         )
 
@@ -70,11 +73,13 @@ def execute_action_plan(
         return ExecutionResult(
             created_assignment_ids=[],
             created_event_ids=[],
+            created_task_ids=[],
             assistant_lines=["No planner/calendar items to add."],
         )
 
     created_assignment_ids: list[int] = []
     created_event_ids: list[int] = []
+    created_task_ids: list[int] = []
     assistant_lines: list[str] = []
     skipped_course_codes: list[str] = []
 
@@ -168,6 +173,30 @@ def execute_action_plan(
                 created_event_ids.append(event.id)
                 assistant_lines.append(f"- Calendar event added: {event.title}")
 
+        # Create tasks.
+        for action in parsed.actions:
+            if action.type != "create_task":
+                continue
+
+            task_action = CreateTaskAction.model_validate(action.model_dump())
+            due_at = None
+            if task_action.due_at:
+                try:
+                    due_at = _parse_iso_datetime(task_action.due_at)
+                except Exception:
+                    pass
+
+            task = Task.objects.create(
+                user=user,
+                title=(task_action.title or "").strip(),
+                description=(task_action.description or ""),
+                due_at=due_at,
+                status=task_action.status,
+                priority=task_action.priority,
+            )
+            created_task_ids.append(task.id)
+            assistant_lines.append(f"- Task added: {task.title}")
+
         # Then create events.
         for action in parsed.actions:
             if action.type != "create_calendar_event":
@@ -215,6 +244,7 @@ def execute_action_plan(
     return ExecutionResult(
         created_assignment_ids=created_assignment_ids,
         created_event_ids=created_event_ids,
+        created_task_ids=created_task_ids,
         assistant_lines=assistant_lines,
     )
 

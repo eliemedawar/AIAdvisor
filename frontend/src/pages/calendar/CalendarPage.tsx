@@ -78,6 +78,7 @@ export const CalendarPage = () => {
   const [formType, setFormType] = useState("study");
   const [formCourse, setFormCourse] = useState<string>("");
   const [formAssignment, setFormAssignment] = useState<string>("");
+  const [formDateError, setFormDateError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Auto-switch to agenda on mobile-width viewports
@@ -144,6 +145,7 @@ export const CalendarPage = () => {
     setFormType("study");
     setFormCourse("");
     setFormAssignment("");
+    setFormDateError(null);
     setIsAddEventOpen(true);
   };
 
@@ -156,6 +158,11 @@ export const CalendarPage = () => {
 
   const handleCreateEvent = async () => {
     if (!formTitle.trim() || !formStart || !formEnd) return;
+    if (new Date(formEnd) <= new Date(formStart)) {
+      setFormDateError("End time must be after start time.");
+      return;
+    }
+    setFormDateError(null);
     setSaving(true);
     try {
       const payload: CreateEventPayload = {
@@ -366,7 +373,7 @@ export const CalendarPage = () => {
             <Button variant="ghost" size="sm" onClick={() => setIsAddEventOpen(false)} disabled={saving}>
               Cancel
             </Button>
-            <Button variant="primary" size="sm" onClick={handleCreateEvent} loading={saving} disabled={!formTitle.trim() || !formStart || !formEnd}>
+            <Button variant="primary" size="sm" onClick={handleCreateEvent} loading={saving} disabled={!formTitle.trim() || !formStart || !formEnd || !!formDateError}>
               Create Event
             </Button>
           </>
@@ -392,7 +399,7 @@ export const CalendarPage = () => {
               <input
                 type="datetime-local"
                 value={formStart}
-                onChange={(e) => setFormStart(e.target.value)}
+                onChange={(e) => { setFormStart(e.target.value); setFormDateError(null); }}
                 className="w-full rounded-xl border border-slate-700/80 bg-slate-900/60 px-4 py-2.5 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-primary-500/50"
               />
             </div>
@@ -401,11 +408,17 @@ export const CalendarPage = () => {
               <input
                 type="datetime-local"
                 value={formEnd}
-                onChange={(e) => setFormEnd(e.target.value)}
-                className="w-full rounded-xl border border-slate-700/80 bg-slate-900/60 px-4 py-2.5 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-primary-500/50"
+                onChange={(e) => { setFormEnd(e.target.value); setFormDateError(null); }}
+                className={`w-full rounded-xl border bg-slate-900/60 px-4 py-2.5 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-primary-500/50 ${formDateError ? "border-red-500/70" : "border-slate-700/80"}`}
               />
             </div>
           </div>
+          {formDateError && (
+            <p className="flex items-center gap-1.5 text-xs text-red-400">
+              <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+              {formDateError}
+            </p>
+          )}
           <Select label="Type" value={formType} onChange={(e) => setFormType(e.target.value)}>
             <option value="study">Study</option>
             <option value="class">Class</option>

@@ -159,25 +159,34 @@ export const TopBar = ({ onToggleSidebar, isSidebarOpen, menuButtonRef }: TopBar
 
                 {/* Notification permission toggle */}
                 {notificationPermission !== "unsupported" && (
-                  <button
-                    onClick={requestPermission}
-                    title={
-                      notificationPermission === "granted"
-                        ? "Browser notifications enabled"
-                        : "Enable browser notifications"
-                    }
-                    className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium transition-colors ${
-                      notificationPermission === "granted"
-                        ? "text-emerald-400 bg-emerald-900/20 border border-emerald-800/40"
-                        : "text-slate-400 bg-slate-800/40 border border-slate-700/40 hover:text-slate-200"
-                    }`}
-                  >
-                    {notificationPermission === "granted" ? (
-                      <><Bell className="h-3 w-3" /> On</>
-                    ) : (
-                      <><BellOff className="h-3 w-3" /> Enable alerts</>
-                    )}
-                  </button>
+                  notificationPermission === "denied" ? (
+                    <span
+                      title="Notifications are blocked in your browser settings. To enable, update your browser's site permissions."
+                      className="flex cursor-default items-center gap-1 rounded-lg border border-slate-700/40 bg-slate-800/40 px-2 py-1 text-[10px] font-medium text-slate-500"
+                    >
+                      <BellOff className="h-3 w-3" /> Blocked
+                    </span>
+                  ) : (
+                    <button
+                      onClick={requestPermission}
+                      title={
+                        notificationPermission === "granted"
+                          ? "Browser notifications enabled"
+                          : "Enable browser notifications"
+                      }
+                      className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium transition-colors ${
+                        notificationPermission === "granted"
+                          ? "text-emerald-400 bg-emerald-900/20 border border-emerald-800/40"
+                          : "text-slate-400 bg-slate-800/40 border border-slate-700/40 hover:text-slate-200"
+                      }`}
+                    >
+                      {notificationPermission === "granted" ? (
+                        <><Bell className="h-3 w-3" /> On</>
+                      ) : (
+                        <><BellOff className="h-3 w-3" /> Enable alerts</>
+                      )}
+                    </button>
+                  )
                 )}
               </div>
 

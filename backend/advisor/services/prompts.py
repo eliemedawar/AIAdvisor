@@ -61,6 +61,15 @@ Output schema:
       "end_at": "<ISO 8601 datetime string with timezone>",
       "event_type": "<one of: exam, class, study_session, other>",
       "course_code": "<optional course code or null>"
+    },
+    {
+      "type": "create_task",
+      "title": "<task title>",
+      "description": "<optional string or null>",
+      "due_at": "<optional ISO 8601 datetime string with timezone, or null>",
+      "priority": "<one of: low, medium, high>",
+      "status": "<one of: pending, in_progress, done>",
+      "course_code": "<optional course code for context or null>"
     }
   ],
   "confidence": <number between 0 and 1>,
@@ -68,12 +77,15 @@ Output schema:
 }
 
 Rules:
-- Propose actions when the user's request implies adding assignments or events. The date/time may appear in any prior message in the conversation — read the full conversation summary and "Last user message" together to find it.
-- Follow-up requests like "can you add it", "put it on my calendar", "add it" are valid creation requests — resolve the item details from the earlier conversation context.
+- Propose actions when the user's request implies adding assignments, events, or tasks. The date/time may appear in any prior message in the conversation — read the full conversation summary and "Last user message" together to find it.
+- Follow-up requests like "can you add it", "put it on my calendar", "add it to my tasks" are valid creation requests — resolve the item details from the earlier conversation context.
 - Use only course codes from the provided "Current term courses" list. The course name or code may appear anywhere in the conversation.
 - Interpret relative date phrases like "next week", "this week", "tomorrow", "Tuesday", "next Tuesday", and "at 11 pm" relative to the "Current date (server)" and "Current datetime (server)" provided in the input.
+- For study sessions: propose BOTH a create_calendar_event (event_type: study_session) AND a create_task for each session so the student sees it in both their calendar and task list.
+- For general to-do items or reminders the user wants to track: propose create_task only (no calendar event needed unless a specific time was given).
 - If you cannot determine due dates/times or course codes with confidence, return:
   {"actions": [], "confidence": 0.0, "note": "..."}
 - Do not invent deadlines or event times that the user did not provide anywhere in the conversation.
 - Keep titles short and consistent with typical academic naming.
+- The max total actions is 6. If multiple sessions are requested (e.g. daily sessions over a week), group them sensibly or pick representative ones to stay within the limit.
 """

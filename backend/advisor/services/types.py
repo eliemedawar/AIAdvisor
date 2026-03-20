@@ -32,6 +32,7 @@ class RouterOutput(BaseModel):
 AssignmentType = Literal["homework", "project", "exam", "quiz", "other"]
 EventType = Literal["exam", "class", "study_session", "other"]
 AssignmentStatus = Literal["pending", "in_progress", "done"]
+TaskPriority = Literal["low", "medium", "high"]
 
 
 class CreateAssignmentAction(BaseModel):
@@ -64,7 +65,23 @@ class CreateCalendarEventAction(BaseModel):
     )
 
 
-Action = CreateAssignmentAction | CreateCalendarEventAction
+class CreateTaskAction(BaseModel):
+    type: Literal["create_task"]
+    title: str = Field(description="Task title.")
+    description: str | None = Field(default=None, description="Optional task description.")
+    due_at: str | None = Field(
+        default=None,
+        description="Optional ISO 8601 datetime string for when the task is due.",
+    )
+    priority: TaskPriority = Field(default="medium")
+    status: AssignmentStatus = Field(default="pending")
+    course_code: str | None = Field(
+        default=None,
+        description="Optional course code to provide context (informational).",
+    )
+
+
+Action = CreateAssignmentAction | CreateCalendarEventAction | CreateTaskAction
 
 
 class ActionPlanInput(BaseModel):

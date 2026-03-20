@@ -1,6 +1,6 @@
 import { ChangeEvent, FormEvent, KeyboardEvent as ReactKeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Bot as BotIcon, User as UserIcon, AlertCircle, RotateCw, PanelRightOpen, Send as SendIcon, X, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { Bot as BotIcon, User as UserIcon, AlertCircle, RotateCw, PanelRightOpen, Send as SendIcon, X, ChevronLeft, ChevronRight, Trash2, Paperclip } from "lucide-react";
 import {
   Heading,
   Text,
@@ -37,6 +37,7 @@ export const ChatPage = () => {
   } = useAdvisorChat();
   
   const [input, setInput] = useState("");
+  const [attachedContext, setAttachedContext] = useState<string | null>(null);
   const [isAttachModalOpen, setIsAttachModalOpen] = useState(false);
   const [isContextDrawerOpen, setIsContextDrawerOpen] = useState(false);
   const [isLiveContextOpen, setIsLiveContextOpen] = useState(() => {
@@ -101,10 +102,12 @@ export const ChatPage = () => {
     e?.preventDefault();
     const content = input.trim();
     if (!content || sending) return;
-    
+
     setInput("");
+    const ctx = attachedContext ?? undefined;
+    setAttachedContext(null);
     try {
-      await sendMessage(content);
+      await sendMessage(content, ctx);
     } catch (err) {
       // Error is handled in the hook
     }
@@ -114,9 +117,8 @@ export const ChatPage = () => {
     setInput(prompt);
   };
 
-  const handleAttachContext = (context: any) => {
-    console.log("Context attached:", context);
-    // In production, this would be sent with the next message
+  const handleAttachContext = (formattedContext: string) => {
+    setAttachedContext(formattedContext);
   };
 
   const handleRetry = async () => {
@@ -371,12 +373,15 @@ export const ChatPage = () => {
             onChange={setInput}
             onSubmit={handleSubmit}
             onPromptSelect={handleQuickAction}
+            onOpenAttach={() => setIsAttachModalOpen(true)}
             placeholder={
               conversation ? "Ask about your schedule, exams, or study strategy…" : "Preparing your conversation…"
             }
             disabled={!canInteractWithComposer}
             sending={sending || applyingActions}
             showSuggestedPrompts={hasMessages}
+            attachedContext={attachedContext}
+            onClearAttachedContext={() => setAttachedContext(null)}
           />
         </div>
 
@@ -548,6 +553,24 @@ export const ChatPage = () => {
                   );
                 }
 
+                if (a.type === "create_task") {
+                  return (
+                    <div
+                      key={`${a.type}-${idx}`}
+                      className="rounded-xl border border-slate-800/70 bg-slate-950/50 px-3 py-2"
+                    >
+                      <p className="text-sm font-semibold text-slate-100">
+                        Task: {a.title}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        Priority: {a.priority}
+                        {a.due_at && ` · Due: ${new Date(a.due_at).toLocaleString()}`}
+                        {a.course_code && ` · ${a.course_code}`}
+                      </p>
+                    </div>
+                  );
+                }
+
                 return (
                   <div
                     key={`${a.type}-${idx}`}
@@ -572,7 +595,7 @@ export const ChatPage = () => {
       <AttachContextModal
         isOpen={isAttachModalOpen}
         onClose={() => setIsAttachModalOpen(false)}
-        onAttach={handleAttachContext}
+        onAttach={(formattedContext) => handleAttachContext(formattedContext)}
       />
     </>
   );
@@ -583,10 +606,13 @@ interface ChatInputAreaProps {
   onChange: (value: string) => void;
   onSubmit: (event?: FormEvent<HTMLFormElement>) => void;
   onPromptSelect: (prompt: string) => void;
+  onOpenAttach: () => void;
   placeholder?: string;
   disabled?: boolean;
   sending?: boolean;
   showSuggestedPrompts?: boolean;
+  attachedContext?: string | null;
+  onClearAttachedContext?: () => void;
 }
 
 const PROMPT_PRESETS = ["Plan week", "Today focus", "Exam prep", "Explain concept"];
@@ -598,10 +624,13 @@ const ChatInputArea = ({
   onChange,
   onSubmit,
   onPromptSelect,
+  onOpenAttach,
   placeholder,
   disabled = false,
   sending = false,
   showSuggestedPrompts = true,
+  attachedContext,
+  onClearAttachedContext,
 }: ChatInputAreaProps) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const isBusy = disabled || sending;
@@ -658,7 +687,34 @@ const ChatInputArea = ({
           </div>
         )}
 
+        {/* Attached context chip */}
+        {attachedContext && (
+          <div className="flex items-center gap-2 rounded-xl border border-primary-700/40 bg-primary-950/40 px-3 py-1.5 text-xs text-primary-300">
+            <Paperclip className="h-3.5 w-3.5 flex-shrink-0 text-primary-400" />
+            <span className="flex-1 truncate">Context attached</span>
+            <button
+              type="button"
+              onClick={onClearAttachedContext}
+              className="rounded p-0.5 hover:text-primary-100 transition-colors"
+              aria-label="Remove attached context"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
         <div className="flex items-end gap-3 rounded-2xl bg-slate-950/80 border border-slate-800/80 px-4 py-3 backdrop-blur-md shadow-[0_18px_60px_rgba(0,0,0,0.65)]">
+          {/* Paperclip / attach context button */}
+          <button
+            type="button"
+            onClick={onOpenAttach}
+            disabled={isBusy}
+            title="Attach context from planner"
+            className="mb-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:text-slate-200 disabled:opacity-40"
+            aria-label="Attach planner context"
+          >
+            <Paperclip className="h-4 w-4" />
+          </button>
           <textarea
             ref={textareaRef}
             rows={1}
