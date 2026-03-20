@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import {
   Conversation,
   Message,
-  advisorApi
+  advisorApi,
+  type ApplyActionsResponse,
+  type ProposedAction,
 } from "../api/advisorApi";
 
 interface UseAdvisorChatState {
@@ -10,11 +12,16 @@ interface UseAdvisorChatState {
   messages: Message[];
   loading: boolean;
   sending: boolean;
+  applyingActions: boolean;
   error: string | null;
   sendMessage: (content: string) => Promise<void>;
   retryLastMessage: () => Promise<void>;
   clearError: () => void;
   clearConversation: () => Promise<void>;
+  proposedActions: ProposedAction[];
+  actionPlanConfidence?: number;
+  applyProposedActions: () => Promise<ApplyActionsResponse | null>;
+  clearProposedActions: () => void;
 }
 
 export const useAdvisorChat = (): UseAdvisorChatState => {
@@ -22,7 +29,10 @@ export const useAdvisorChat = (): UseAdvisorChatState => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [sending, setSending] = useState<boolean>(false);
+  const [applyingActions, setApplyingActions] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [proposedActions, setProposedActions] = useState<ProposedAction[]>([]);
+  const [actionPlanConfidence, setActionPlanConfidence] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     const init = async () => {
@@ -51,11 +61,14 @@ export const useAdvisorChat = (): UseAdvisorChatState => {
 
   const sendMessage = async (content: string) => {
     if (!conversation || !content.trim()) return;
+    if (proposedActions.length > 0) return; // wait for user confirmation
     setSending(true);
     setError(null);
     try {
-      const newMessages = await advisorApi.sendMessage(conversation.id, content);
-      setMessages((prev) => [...prev, ...newMessages]);
+      const res = await advisorApi.sendMessage(conversation.id, content);
+      setMessages((prev) => [...prev, ...res.messages]);
+      setProposedActions(res.proposed_actions ?? []);
+      setActionPlanConfidence(res.action_plan_confidence);
     } catch (err: any) {
       setError(err?.response?.data?.detail || "Failed to send message.");
       throw err;
@@ -84,9 +97,35 @@ export const useAdvisorChat = (): UseAdvisorChatState => {
     try {
       await advisorApi.clearConversation(conversation.id);
       setMessages([]);
+      setProposedActions([]);
+      setActionPlanConfidence(undefined);
     } catch (err: any) {
       setError(err?.response?.data?.detail || "Failed to clear conversation.");
       throw err;
+    }
+  };
+
+  const clearProposedActions = () => {
+    setProposedActions([]);
+    setActionPlanConfidence(undefined);
+  };
+
+  const applyProposedActions = async () => {
+    if (!conversation) return null;
+    if (!proposedActions.length) return null;
+    setApplyingActions(true);
+    setError(null);
+    try {
+      const res = await advisorApi.applyActions(conversation.id, proposedActions);
+      setMessages(res.messages);
+      setProposedActions([]);
+      setActionPlanConfidence(undefined);
+      return res;
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || "Failed to apply actions.");
+      throw err;
+    } finally {
+      setApplyingActions(false);
     }
   };
 
@@ -95,11 +134,16 @@ export const useAdvisorChat = (): UseAdvisorChatState => {
     messages,
     loading,
     sending,
+    applyingActions,
     error,
     sendMessage,
     retryLastMessage,
     clearError,
-    clearConversation
+    clearConversation,
+    proposedActions,
+    actionPlanConfidence,
+    applyProposedActions,
+    clearProposedActions,
   };
 };
 

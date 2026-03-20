@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Sidebar } from "../components/navigation/Sidebar";
@@ -27,7 +27,54 @@ export const DashboardLayout = () => {
   const location = useLocation();
   const viewport = useBreakpoint();
   const mobileSidebarRef = useRef<HTMLDivElement | null>(null);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isChatRoute = location.pathname.startsWith("/chat");
+
+  const clearCloseTimeout = useCallback(() => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+  }, []);
+
+  const closeMobileNavAfter = useCallback(
+    (delay = 0) => {
+      if (!mobileNavOpen) return;
+
+      clearCloseTimeout();
+
+      if (delay <= 0) {
+        setMobileNavOpen(false);
+        return;
+      }
+
+      closeTimeoutRef.current = setTimeout(() => {
+        setMobileNavOpen(false);
+        closeTimeoutRef.current = null;
+      }, delay);
+    },
+    [mobileNavOpen, clearCloseTimeout]
+  );
+
+  const openMobileNav = useCallback(() => {
+    clearCloseTimeout();
+    setMobileNavOpen(true);
+  }, [clearCloseTimeout]);
+
+  const handleToggleSidebar = useCallback(() => {
+    if (mobileNavOpen) {
+      closeMobileNavAfter();
+    } else {
+      openMobileNav();
+    }
+  }, [mobileNavOpen, closeMobileNavAfter, openMobileNav]);
+
+  useEffect(() => {
+    return () => {
+      clearCloseTimeout();
+    };
+  }, [clearCloseTimeout]);
 
   // Close mobile nav on escape key
   useEffect(() => {
@@ -56,9 +103,52 @@ export const DashboardLayout = () => {
   // Close mobile nav when viewport expands to desktop
   useEffect(() => {
     if (viewport.isLgUp && mobileNavOpen) {
+      clearCloseTimeout();
       setMobileNavOpen(false);
     }
-  }, [viewport.isLgUp, mobileNavOpen]);
+  }, [viewport.isLgUp, mobileNavOpen, clearCloseTimeout]);
+
+  const previousPathRef = useRef(location.pathname);
+
+  // Close mobile nav after route changes (covers cases where onItemClick isn't triggered)
+  useEffect(() => {
+    if (location.pathname === previousPathRef.current) {
+      return;
+    }
+
+    previousPathRef.current = location.pathname;
+
+    if (!viewport.isLgUp) {
+      closeMobileNavAfter(160);
+    }
+  }, [location.pathname, viewport.isLgUp, closeMobileNavAfter]);
+
+  // Close the mobile nav when clicking outside of the drawer
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+
+    const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+
+      if (mobileSidebarRef.current?.contains(target)) {
+        return;
+      }
+
+      if (menuButtonRef.current?.contains(target)) {
+        return;
+      }
+
+      closeMobileNavAfter(100);
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+    };
+  }, [mobileNavOpen, closeMobileNavAfter]);
 
   // Focus the drawer container when it opens for keyboard users
   useEffect(() => {
@@ -79,8 +169,9 @@ export const DashboardLayout = () => {
       <Sidebar />
       <div className="flex min-h-screen flex-col lg:ml-[var(--sidebar-desktop-width,16rem)] lg:h-screen lg:transition-[margin-left] lg:duration-300">
         <TopBar
-          onToggleSidebar={() => setMobileNavOpen(true)}
+          onToggleSidebar={handleToggleSidebar}
           isSidebarOpen={mobileNavOpen}
+          menuButtonRef={menuButtonRef}
         />
         <main
           id="main-content"
@@ -141,7 +232,7 @@ export const DashboardLayout = () => {
             >
               <Sidebar
                 variant="mobile"
-                onItemClick={() => setMobileNavOpen(false)}
+                onItemClick={() => closeMobileNavAfter(140)}
               />
             </motion.div>
           </div>

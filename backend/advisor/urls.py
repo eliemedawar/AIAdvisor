@@ -1,6 +1,10 @@
 from django.urls import path
 
-from .views import ConversationListCreateView, ConversationMessagesView
+from .views import (
+    ConversationApplyActionsView,
+    ConversationListCreateView,
+    ConversationMessagesView,
+)
 
 urlpatterns = [
     path(
@@ -12,5 +16,10 @@ urlpatterns = [
         "conversations/<int:pk>/messages/",
         ConversationMessagesView.as_view(),
         name="advisor-conversation-messages",
+    ),
+    path(
+        "conversations/<int:pk>/apply-actions/",
+        ConversationApplyActionsView.as_view(),
+        name="advisor-conversation-apply-actions",
     ),
 ]

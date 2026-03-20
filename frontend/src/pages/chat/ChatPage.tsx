@@ -1,12 +1,11 @@
 import { ChangeEvent, FormEvent, KeyboardEvent as ReactKeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Bot, User as UserIcon, AlertCircle, RotateCw, PanelRightOpen, Send as SendIcon, X, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { Bot as BotIcon, User as UserIcon, AlertCircle, RotateCw, PanelRightOpen, Send as SendIcon, X, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import {
   Heading,
   Text,
   Card,
   Button,
-  EmptyState,
   Modal,
 } from "../../components";
 import { SkeletonChatMessage } from "../../components/core/Skeleton";
@@ -25,11 +24,16 @@ export const ChatPage = () => {
     messages, 
     loading, 
     sending, 
+    applyingActions,
     error, 
     sendMessage,
     retryLastMessage,
     clearError,
-    clearConversation
+    clearConversation,
+    proposedActions,
+    actionPlanConfidence,
+    applyProposedActions,
+    clearProposedActions
   } = useAdvisorChat();
   
   const [input, setInput] = useState("");
@@ -47,10 +51,18 @@ export const ChatPage = () => {
   const viewport = useBreakpoint();
   const showInlineContext = viewport.isDesktop;
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll to bottom when messages change, but only if the user is
+  // already near the bottom. This prevents "scrolling down" while the user
+  // is reading older messages.
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const nearBottom = distanceFromBottom < 120; // px threshold
+
+    if (nearBottom) {
+      el.scrollTop = el.scrollHeight;
     }
   }, [messages, sending]);
 
@@ -143,13 +155,17 @@ export const ChatPage = () => {
     return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
-  const canClearConversation = messages.length > 0 && !loading && !sending;
+  const hasMessages = messages.length > 0;
+  const canClearConversation =
+    hasMessages && !loading && !sending && proposedActions.length === 0 && !applyingActions;
+  const hasPendingActionPlan = proposedActions.length > 0;
+  const canInteractWithComposer = !hasPendingActionPlan && !loading && !sending && !applyingActions;
 
   return (
     <>
       <div className="flex h-full w-full flex-1 min-h-0 overflow-hidden">
         {/* Center Chat Column */}
-        <div className="relative flex min-w-0 flex-1 flex-col min-h-0">
+        <div className="relative flex flex-1 flex-col min-h-0">
           {showInlineContext && (
             <button
               type="button"
@@ -165,9 +181,9 @@ export const ChatPage = () => {
               )}
             </button>
           )}
-          {/* Header */}
+
           <div className="border-b border-slate-800/30 bg-slate-950/40 px-4 py-3 sm:px-6 sm:py-4 backdrop-blur-sm">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <Heading level="h1" className="text-xl sm:text-2xl">
                   AI Academic Advisor
@@ -176,229 +192,192 @@ export const ChatPage = () => {
                   Ask questions about courses, exams, and study strategies
                 </Text>
               </div>
-            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                icon={<Trash2 className="h-3.5 w-3.5" />}
-                onClick={handleOpenClearModal}
-                disabled={!canClearConversation || isClearingConversation}
-                aria-label="Clear conversation"
-                title="Clear chat"
-                className="text-xs text-slate-200"
-              >
-                <span className="hidden sm:inline">Clear chat</span>
-                <span className="sr-only sm:hidden">Clear conversation</span>
-              </Button>
-              {!showInlineContext && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon={<PanelRightOpen className="h-4 w-4" />}
-                  onClick={() => setIsContextDrawerOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-800/60 bg-slate-900/60 text-xs text-slate-200 transition-all hover:bg-slate-900/80"
-                >
-                  View context
-                </Button>
-              )}
-            </div>
-            </div>
-          </div>
-
-          {/* Chat Column Content */}
-          <div className="relative flex min-w-0 flex-1 flex-col min-h-0">
-            {/* Messages Area */}
-            <div
-              ref={scrollRef}
-              className="scrollable flex-1 overflow-y-auto px-4 py-3 sm:px-6 sm:py-4"
-            >
-              <div className="space-y-4 pb-32">
-                {loading && !messages.length ? (
-                  <div className="space-y-4">
-                    <SkeletonChatMessage isUser={false} />
-                    <SkeletonChatMessage isUser={true} />
-                    <SkeletonChatMessage isUser={false} />
-                  </div>
-                ) : !messages.length ? (
-                  <div className="flex h-full items-center justify-center">
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.24, ease: [0.4, 0, 0.2, 1] }}
-                      className="w-full max-w-md"
-                    >
-                      <EmptyState
-                        icon={<Bot />}
-                        title="Start your conversation"
-                        description="Ask about upcoming exams, study plans, course recommendations, or how to prioritize your workload."
-                        action={
-                          <Button
-                            size="sm"
-                            variant="primary"
-                            onClick={() => handleQuickAction("Can you help me plan my week?")}
-                          >
-                            Try a prompt
-                          </Button>
-                        }
-                        className="rounded-2xl border border-dashed border-slate-900/60 bg-slate-950/20"
-                      />
-                    </motion.div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="space-y-2">
-                      {groupedMessages.map((group) => (
-                        <div key={group.date}>
-                          <DateSeparator date={group.date} />
-                          <AnimatePresence mode="popLayout">
-                            {group.messages.map((message, index) => {
-                              const isUser = message.role === "user";
-                              const messageTime = formatMessageTime(message.created_at);
-                              return (
-                                <motion.div
-                                  key={message.id}
-                                  initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 14 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, y: prefersReducedMotion ? 0 : -10, scale: prefersReducedMotion ? 1 : 0.98 }}
-                                  transition={{ duration: 0.18, delay: index * 0.02, ease: [0.4, 0.1, 0.2, 1] }}
-                                  className={`group mb-5 flex ${
-                                    isUser ? "justify-end" : "justify-start"
-                                  }`}
-                                >
-                                  <div
-                                    className={`flex w-full max-w-2xl items-end gap-3 sm:gap-4 ${
-                                      isUser ? "flex-row-reverse" : "flex-row"
-                                    }`}
-                                  >
-                                    {/* Avatar */}
-                                    <div
-                                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-semibold transition-all duration-quick ease-snappy ${
-                                        isUser
-                                          ? "bg-gradient-to-br from-primary-500 to-accent-500 text-white shadow-elevation-mid"
-                                          : "border border-slate-800/70 bg-surface-elevated text-slate-200 shadow-elevation-low"
-                                      }`}
-                                    >
-                                      {isUser ? (
-                                        <UserIcon className="h-4 w-4" />
-                                      ) : (
-                                        <Bot className="h-4 w-4" />
-                                      )}
-                                    </div>
-
-                                    {/* Message Bubble */}
-                                    <div
-                                      className={`w-full max-w-xl rounded-2xl px-4 py-3 shadow-elevation-low transition-all duration-base ease-smooth ${
-                                        isUser
-                                          ? "bg-gradient-to-br from-primary-600 to-primary-500 text-slate-50 shadow-elevation-mid ring-1 ring-primary-500/20"
-                                          : "border border-slate-800/70 bg-surface-elevated text-slate-100 shadow-elevation-low ring-1 ring-slate-900/40"
-                                      }`}
-                                    >
-                                      <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                                        {message.content}
-                                      </p>
-                                      <div
-                                        className={`mt-2 flex items-center gap-2 text-[11px] leading-tight ${
-                                          isUser ? "justify-end text-slate-200" : "justify-between text-slate-400"
-                                        }`}
-                                      >
-                                        {!isUser && <span className="font-medium text-slate-300">Advisor</span>}
-                                        {isUser && <span className="font-medium">You</span>}
-                                        <span className="opacity-90">{messageTime}</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </motion.div>
-                              );
-                            })}
-                          </AnimatePresence>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Typing Indicator */}
-                    {sending && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.12, ease: [0.25, 1, 0.5, 1] }}
-                        className="flex justify-start"
-                        role="status"
-                        aria-live="polite"
-                        aria-label="AI is typing"
-                      >
-                        <div className="flex items-end gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-800/70 bg-surface-elevated shadow-elevation-low">
-                            <Bot className="h-4 w-4 text-slate-200" />
-                          </div>
-                          <div className="flex items-center gap-1.5 rounded-2xl border border-slate-800/70 bg-surface-elevated shadow-elevation-low ring-1 ring-slate-900/40 px-4 py-3">
-                            <span className="inline-flex h-2 w-2 animate-pulse-dots rounded-full bg-slate-400" />
-                            <span className="inline-flex h-2 w-2 animate-pulse-dots rounded-full bg-slate-500 [animation-delay:0.2s]" />
-                            <span className="inline-flex h-2 w-2 animate-pulse-dots rounded-full bg-slate-400 [animation-delay:0.4s]" />
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
-
-                    {/* Error State */}
-                    {error && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
-                        role="alert"
-                        aria-live="assertive"
-                      >
-                        <Card
-                          variant="default"
-                          padding="md"
-                          className="border-error-500/50 bg-error-500/10"
-                        >
-                          <div className="flex items-start gap-3">
-                            <AlertCircle className="h-5 w-5 shrink-0 text-error-500" aria-hidden="true" />
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-error-400">
-                                Failed to send message
-                              </p>
-                              <p className="mt-1 text-xs text-slate-400">{error}</p>
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={handleRetry}
-                                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-error-400 transition-all duration-quick ease-snappy hover:bg-error-500/20"
-                              >
-                                <RotateCw className="h-3.5 w-3.5" />
-                                Retry
-                              </button>
-                              <button
-                                onClick={clearError}
-                                className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-400 transition-all duration-quick ease-snappy hover:bg-surface-elevated"
-                              >
-                                Dismiss
-                              </button>
-                            </div>
-                          </div>
-                        </Card>
-                      </motion.div>
-                    )}
-                  </>
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                {hasMessages && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    icon={<Trash2 className="h-3.5 w-3.5" />}
+                    onClick={handleOpenClearModal}
+                    disabled={!canClearConversation || isClearingConversation}
+                    aria-label="Clear conversation"
+                    title="Clear chat"
+                    className="rounded-lg px-2 py-1.5 text-xs text-slate-300 hover:text-white"
+                  >
+                    <span className="hidden sm:inline">Clear chat</span>
+                    <span className="sr-only sm:hidden">Clear conversation</span>
+                  </Button>
+                )}
+                {!showInlineContext && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={<PanelRightOpen className="h-4 w-4" />}
+                    onClick={() => setIsContextDrawerOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-800/60 bg-slate-900/60 text-xs text-slate-200 transition-all hover:bg-slate-900/80"
+                  >
+                    View context
+                  </Button>
                 )}
               </div>
             </div>
-            <ChatInputArea
-              value={input}
-              onChange={setInput}
-              onSubmit={handleSubmit}
-              onPromptSelect={handleQuickAction}
-              placeholder={
-                conversation
-                  ? "Ask about your schedule, exams, or study strategy…"
-                  : "Preparing your conversation…"
-              }
-              disabled={loading}
-              sending={sending}
-            />
           </div>
+
+          <div
+            ref={scrollRef}
+            className="scrollable flex flex-1 flex-col overflow-y-auto px-4 pb-32 pt-4 sm:px-6 sm:pb-36"
+          >
+            {loading && !hasMessages ? (
+              <div className="space-y-4">
+                <SkeletonChatMessage isUser={false} />
+                <SkeletonChatMessage isUser={true} />
+                <SkeletonChatMessage isUser={false} />
+              </div>
+            ) : hasMessages ? (
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  {groupedMessages.map((group) => (
+                    <div key={group.date}>
+                      <DateSeparator date={group.date} />
+                      <AnimatePresence mode="popLayout">
+                        {group.messages.map((message, index) => {
+                          const isUser = message.role === "user";
+                          const messageTime = formatMessageTime(message.created_at);
+                          return (
+                            <motion.div
+                              key={message.id}
+                              initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 14 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{
+                                opacity: 0,
+                                y: prefersReducedMotion ? 0 : -10,
+                                scale: prefersReducedMotion ? 1 : 0.98,
+                              }}
+                              transition={{ duration: 0.18, delay: index * 0.02, ease: [0.4, 0.1, 0.2, 1] }}
+                              className={`group mb-5 flex ${isUser ? "justify-end" : "justify-start"}`}
+                            >
+                              <div
+                                className={`flex w-full max-w-2xl items-end gap-3 sm:gap-4 ${
+                                  isUser ? "flex-row-reverse" : "flex-row"
+                                }`}
+                              >
+                                <div
+                                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-semibold transition-all duration-quick ease-snappy ${
+                                    isUser
+                                      ? "bg-gradient-to-br from-primary-500 to-accent-500 text-white shadow-elevation-mid"
+                                      : "border border-slate-800/70 bg-surface-elevated text-slate-200 shadow-elevation-low"
+                                  }`}
+                                >
+                                  {isUser ? (
+                                    <UserIcon className="h-4 w-4" />
+                                  ) : (
+                                    <BotIcon className="h-4 w-4" />
+                                  )}
+                                </div>
+
+                                <div
+                                  className={`w-full max-w-xl rounded-2xl px-4 py-3 shadow-elevation-low transition-all duration-base ease-smooth ${
+                                    isUser
+                                      ? "bg-gradient-to-br from-primary-600 to-primary-500 text-slate-50 shadow-elevation-mid ring-1 ring-primary-500/20"
+                                      : "border border-slate-800/70 bg-surface-elevated text-slate-100 shadow-elevation-low ring-1 ring-slate-900/40"
+                                  }`}
+                                >
+                                  <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+                                  <div
+                                    className={`mt-2 flex items-center gap-2 text-[11px] leading-tight ${
+                                      isUser ? "justify-end text-slate-200" : "justify-between text-slate-400"
+                                    }`}
+                                  >
+                                    {!isUser && <span className="font-medium text-slate-300">Advisor</span>}
+                                    {isUser && <span className="font-medium">You</span>}
+                                    <span className="opacity-90">{messageTime}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </motion.div>
+                          );
+                        })}
+                      </AnimatePresence>
+                    </div>
+                  ))}
+                </div>
+
+                {sending && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.12, ease: [0.25, 1, 0.5, 1] }}
+                    className="flex justify-start"
+                    role="status"
+                    aria-live="polite"
+                    aria-label="AI is typing"
+                  >
+                    <div className="flex items-end gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-800/70 bg-surface-elevated shadow-elevation-low">
+                        <BotIcon className="h-4 w-4 text-slate-200" />
+                      </div>
+                      <div className="flex items-center gap-1.5 rounded-2xl border border-slate-800/70 bg-surface-elevated shadow-elevation-low ring-1 ring-slate-900/40 px-4 py-3">
+                        <span className="inline-flex h-2 w-2 animate-pulse-dots rounded-full bg-slate-400" />
+                        <span className="inline-flex h-2 w-2 animate-pulse-dots rounded-full bg-slate-500 [animation-delay:0.2s]" />
+                        <span className="inline-flex h-2 w-2 animate-pulse-dots rounded-full bg-slate-400 [animation-delay:0.4s]" />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
+                    role="alert"
+                    aria-live="assertive"
+                  >
+                    <Card variant="default" padding="md" className="border-error-500/50 bg-error-500/10">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 shrink-0 text-error-500" aria-hidden="true" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-error-400">Failed to send message</p>
+                          <p className="mt-1 text-xs text-slate-400">{error}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleRetry}
+                            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-error-400 transition-all duration-quick ease-snappy hover:bg-error-500/20"
+                          >
+                            <RotateCw className="h-3.5 w-3.5" />
+                            Retry
+                          </button>
+                          <button
+                            onClick={clearError}
+                            className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-400 transition-all duration-quick ease-snappy hover:bg-surface-elevated"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    </Card>
+                  </motion.div>
+                )}
+              </div>
+            ) : (
+              <EmptyChatState onSelectPrompt={handleQuickAction} />
+            )}
+          </div>
+
+          <ChatInputArea
+            value={input}
+            onChange={setInput}
+            onSubmit={handleSubmit}
+            onPromptSelect={handleQuickAction}
+            placeholder={
+              conversation ? "Ask about your schedule, exams, or study strategy…" : "Preparing your conversation…"
+            }
+            disabled={!canInteractWithComposer}
+            sending={sending || applyingActions}
+            showSuggestedPrompts={hasMessages}
+          />
         </div>
 
         {/* Context Sidebar - inline on lg+ */}
@@ -422,7 +401,7 @@ export const ChatPage = () => {
     {/* Mobile Context Drawer */}
     <AnimatePresence>
       {isContextDrawerOpen && !showInlineContext && (
-        <div className="fixed inset-0 z-40 flex lg:hidden" role="dialog" aria-modal="true" aria-label="Study context drawer">
+        <div className="fixed inset-0 z-40 flex justify-end lg:hidden" role="dialog" aria-modal="true" aria-label="Study context drawer">
           <motion.button
             type="button"
             className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm"
@@ -436,7 +415,7 @@ export const ChatPage = () => {
             animate={{ x: 0 }}
             exit={{ x: 360 }}
             transition={{ type: "tween", ease: "easeOut", duration: 0.25 }}
-            className="relative z-50 h-full w-80 max-w-full"
+            className="relative z-50 ml-auto h-full w-80 max-w-full"
           >
             <div className="flex h-full flex-col border-l border-slate-900/60 bg-slate-950/95 text-slate-100 shadow-[0_0_60px_rgba(2,6,23,0.95)] backdrop-blur-2xl">
               <div className="flex items-center justify-between border-b border-slate-900/60 px-5 py-4">
@@ -500,6 +479,95 @@ export const ChatPage = () => {
         </p>
       </Modal>
 
+      {/* AI proposed actions confirmation */}
+      <Modal
+        isOpen={hasPendingActionPlan}
+        onClose={clearProposedActions}
+        title="AI wants to update your planner"
+        size="md"
+        disableBackdropClose={applyingActions}
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={clearProposedActions}
+              disabled={applyingActions}
+            >
+              Reject
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={async () => {
+                try {
+                  await applyProposedActions();
+                } catch {
+                  // Error is shown via hook state
+                }
+              }}
+              loading={applyingActions}
+              disabled={applyingActions}
+            >
+              Confirm & add
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-slate-300">
+            Review the items below. Nothing is added until you confirm.
+          </p>
+          {actionPlanConfidence !== undefined && (
+            <p className="text-xs text-slate-500">
+              AI confidence: {(actionPlanConfidence * 100).toFixed(0)}%
+            </p>
+          )}
+
+          {proposedActions.length === 0 ? (
+            <p className="text-xs text-slate-400">No actions proposed.</p>
+          ) : (
+            <div className="space-y-2">
+              {proposedActions.map((a, idx) => {
+                if (a.type === "create_assignment") {
+                  return (
+                    <div
+                      key={`${a.type}-${idx}`}
+                      className="rounded-xl border border-slate-800/70 bg-slate-950/50 px-3 py-2"
+                    >
+                      <p className="text-sm font-semibold text-slate-100">
+                        Assignment: {a.title}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        Course: {a.course_code} · Due:{" "}
+                        {new Date(a.due_at).toLocaleString()}
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    key={`${a.type}-${idx}`}
+                    className="rounded-xl border border-slate-800/70 bg-slate-950/50 px-3 py-2"
+                  >
+                    <p className="text-sm font-semibold text-slate-100">
+                      Event: {a.title}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      Starts: {new Date(a.start_at).toLocaleString()} · Ends:{" "}
+                      {new Date(a.end_at).toLocaleString()}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </Modal>
+
       {/* Attach Context Modal */}
       <AttachContextModal
         isOpen={isAttachModalOpen}
@@ -518,6 +586,7 @@ interface ChatInputAreaProps {
   placeholder?: string;
   disabled?: boolean;
   sending?: boolean;
+  showSuggestedPrompts?: boolean;
 }
 
 const PROMPT_PRESETS = ["Plan week", "Today focus", "Exam prep", "Explain concept"];
@@ -532,6 +601,7 @@ const ChatInputArea = ({
   placeholder,
   disabled = false,
   sending = false,
+  showSuggestedPrompts = true,
 }: ChatInputAreaProps) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const isBusy = disabled || sending;
@@ -569,22 +639,24 @@ const ChatInputArea = ({
   return (
     <div className="sticky bottom-0 left-0 right-0 px-6 pb-5 pt-3 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent backdrop-blur-sm">
       <form onSubmit={handleFormSubmit} className="max-w-3xl mx-auto w-full space-y-2">
-        <div className="flex flex-wrap items-center gap-2 text-[11px] font-medium">
-          <span className="uppercase tracking-[0.16em] text-slate-400">Suggested prompts</span>
-          <span className="text-slate-500">· Tap to autofill</span>
-          <div className="ml-auto flex flex-wrap gap-2">
-            {PROMPT_PRESETS.map((prompt) => (
-              <button
-                key={prompt}
-                type="button"
-                onClick={() => handlePromptClick(prompt)}
-                className="rounded-full border border-slate-700/70 bg-slate-900/80 px-3 py-1 text-[11px] text-slate-100 transition hover:border-slate-400 hover:bg-slate-900"
-              >
-                {prompt}
-              </button>
-            ))}
+        {showSuggestedPrompts && (
+          <div className="flex flex-wrap items-center gap-2 text-[11px] font-medium">
+            <span className="uppercase tracking-[0.16em] text-slate-400">Suggested prompts</span>
+            <span className="text-slate-500">· Tap to autofill</span>
+            <div className="ml-auto flex flex-wrap gap-2">
+              {PROMPT_PRESETS.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => handlePromptClick(prompt)}
+                  className="rounded-full border border-slate-700/70 bg-slate-900/80 px-3 py-1 text-[11px] text-slate-100 transition hover:border-slate-400 hover:bg-slate-900"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="flex items-end gap-3 rounded-2xl bg-slate-950/80 border border-slate-800/80 px-4 py-3 backdrop-blur-md shadow-[0_18px_60px_rgba(0,0,0,0.65)]">
           <textarea
@@ -612,3 +684,46 @@ const ChatInputArea = ({
     </div>
   );
 };
+
+interface EmptyChatStateProps {
+  onSelectPrompt: (prompt: string) => void;
+}
+
+function EmptyChatState({ onSelectPrompt }: EmptyChatStateProps) {
+  return (
+    <div className="flex flex-1 items-center justify-center">
+      <div className="w-full max-w-[460px] rounded-3xl border border-slate-800/80 bg-slate-950/80 px-10 py-9 backdrop-blur-xl shadow-[0_24px_80px_rgba(0,0,0,0.65)]">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="h-11 w-11 flex items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500">
+            <BotIcon className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-slate-50">Start your conversation</h2>
+            <p className="text-sm text-slate-400">
+              Ask about upcoming exams, study plans, course choices, or how to prioritize your workload.
+            </p>
+          </div>
+        </div>
+
+        <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500 mb-3">Quick starters</p>
+
+        <div className="flex flex-wrap gap-2">
+          {[
+            "Review my week and tell me what to focus on.",
+            "Help me study for my next exam.",
+            "Suggest courses for next semester.",
+          ].map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => onSelectPrompt(p)}
+              className="rounded-full border border-slate-700/80 bg-slate-900/80 px-4 py-2 text-xs text-slate-100 hover:border-slate-400 hover:bg-slate-900 transition"
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

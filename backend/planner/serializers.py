@@ -20,11 +20,14 @@ class CourseSerializer(serializers.ModelSerializer):
 
 
 class AssignmentSerializer(serializers.ModelSerializer):
+    course_name = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = Assignment
         fields = (
             "id",
             "course",
+            "course_name",
             "title",
             "description",
             "due_at",
@@ -32,6 +35,9 @@ class AssignmentSerializer(serializers.ModelSerializer):
             "weight",
             "type",
         )
+
+    def get_course_name(self, obj):
+        return obj.course.name if getattr(obj, "course", None) else None
 
 
 class TaskSerializer(serializers.ModelSerializer):

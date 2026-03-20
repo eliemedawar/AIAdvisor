@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Plus, Check, Eye } from "lucide-react";
+import { X, Plus, Check } from "lucide-react";
+import { useState } from "react";
 import { CalendarEvent } from "../../api/plannerApi";
 import { formatRelativeDate, formatDate, sortEventsByTime } from "../../utils/calendar";
 import { EventIndicator } from "./EventIndicator";
@@ -13,6 +14,7 @@ interface DayDetailsPanelProps {
   dateKey: string | null;
   events: CalendarEvent[];
   onAddEvent?: () => void;
+  onComplete?: (event: CalendarEvent) => Promise<void>;
 }
 
 /**
@@ -25,11 +27,30 @@ export const DayDetailsPanel = ({
   dateKey,
   events,
   onAddEvent,
+  onComplete,
 }: DayDetailsPanelProps) => {
+  const [completingIds, setCompletingIds] = useState<Set<number>>(new Set());
+  const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
+
   if (!dateKey) return null;
 
   const date = parseISO(dateKey);
   const sortedEvents = sortEventsByTime(events);
+
+  const handleComplete = async (event: CalendarEvent) => {
+    if (!onComplete || completingIds.has(event.id) || completedIds.has(event.id)) return;
+    setCompletingIds((prev) => new Set(prev).add(event.id));
+    try {
+      await onComplete(event);
+      setCompletedIds((prev) => new Set(prev).add(event.id));
+    } finally {
+      setCompletingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(event.id);
+        return next;
+      });
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -94,22 +115,31 @@ export const DayDetailsPanel = ({
                     <div key={event.id} className="group rounded-2xl border border-slate-900/60 bg-slate-950/40 p-3 shadow-elevation-flat transition-colors hover:border-slate-800/70">
                       <EventIndicator event={event} showTime showLocation delay={idx * 0.04} />
 
-                      {/* Quick Actions (placeholder for future) */}
+                      {/* Quick Actions */}
                       <div className="mt-3 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-                        <button
-                          className="flex flex-1 items-center justify-center gap-1 rounded-xl border border-slate-900/60 px-3 py-1.5 text-xs text-slate-400 transition-smooth hover:border-slate-800 hover:text-slate-100"
-                          aria-label="View details"
-                        >
-                          <Eye className="h-3 w-3" />
-                          <span>View</span>
-                        </button>
-                        <button
-                          className="flex flex-1 items-center justify-center gap-1 rounded-xl border border-slate-900/60 px-3 py-1.5 text-xs text-slate-400 transition-smooth hover:border-slate-800 hover:text-slate-100"
-                          aria-label="Mark complete"
-                        >
-                          <Check className="h-3 w-3" />
-                          <span>Complete</span>
-                        </button>
+                        {onComplete && (
+                          <button
+                            onClick={() => handleComplete(event)}
+                            disabled={completingIds.has(event.id) || completedIds.has(event.id)}
+                            className={`flex flex-1 items-center justify-center gap-1 rounded-xl border px-3 py-1.5 text-xs transition-smooth
+                              ${completedIds.has(event.id)
+                                ? "border-emerald-700/60 bg-emerald-900/20 text-emerald-400 cursor-default"
+                                : completingIds.has(event.id)
+                                ? "border-slate-800 text-slate-500 cursor-wait"
+                                : "border-slate-900/60 text-slate-400 hover:border-slate-800 hover:text-slate-100"
+                              }`}
+                            aria-label="Mark complete"
+                          >
+                            <Check className="h-3 w-3" />
+                            <span>
+                              {completedIds.has(event.id)
+                                ? "Done!"
+                                : completingIds.has(event.id)
+                                ? "Saving…"
+                                : "Complete"}
+                            </span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}

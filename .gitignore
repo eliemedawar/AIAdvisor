@@ -37,6 +37,10 @@ pnpm-debug.log*
 .env
 .env.*
 
+# Scratch / notes with secrets
+backend/New Text Document.txt
+"backend/New Text Document.txt"
+
 # Build / coverage artifacts
 coverage/
 dist/
@@ -44,5 +48,17 @@ build/
 *.coverage
 .pytest_cache/
 *.egg-info/
+
+
+
+
+
+
+
+
+
+
+
+
 
 

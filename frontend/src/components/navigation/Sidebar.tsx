@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import clsx from "clsx";
 import {
   LayoutDashboard,
@@ -7,7 +7,8 @@ import {
   User,
   GraduationCap,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  ListTodo,
 } from "lucide-react";
 import { SidebarNavItem } from "../core/SidebarNavItem";
 import { useBreakpoint } from "../../hooks/useBreakpoint";
@@ -16,6 +17,7 @@ const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: <LayoutDashboard className="h-5 w-5" /> },
   { to: "/chat", label: "AI Advisor", icon: <MessageCircle className="h-5 w-5" /> },
   { to: "/calendar", label: "Calendar", icon: <CalendarDays className="h-5 w-5" /> },
+  { to: "/planner", label: "Planner", icon: <ListTodo className="h-5 w-5" /> },
   { to: "/profile", label: "Profile", icon: <User className="h-5 w-5" /> }
 ];
 
@@ -47,6 +49,17 @@ export const Sidebar = ({ variant = "desktop", onItemClick }: SidebarProps) => {
 
   const baseClasses =
     "flex flex-col border-r border-slate-800/50 bg-surface-base shadow-elevation-mid backdrop-blur-xl";
+
+  const handleNavClickCapture = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (variant !== "mobile" || !onItemClick) return;
+
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
+
+    if (target.closest("[data-sidebar-nav-link='true']")) {
+      onItemClick();
+    }
+  };
 
   useEffect(() => {
     if (variant !== "desktop") return;
@@ -124,7 +137,10 @@ export const Sidebar = ({ variant = "desktop", onItemClick }: SidebarProps) => {
       </div>
 
       {/* Navigation - 8pt spacing (space-y-1, px-3, py-6) */}
-      <nav className="flex-1 space-y-1 px-3 py-6 overflow-x-hidden overflow-y-auto pr-2">
+      <nav
+        className="flex-1 space-y-1 px-3 py-6 overflow-x-hidden overflow-y-auto pr-2"
+        onClickCapture={handleNavClickCapture}
+      >
         {navItems.map((item) => (
           <div key={item.to} className="relative group">
             <SidebarNavItem

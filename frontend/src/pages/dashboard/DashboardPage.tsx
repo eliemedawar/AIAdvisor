@@ -71,7 +71,7 @@ const buildAnalyticsInsight = (
 
 export const DashboardPage = () => {
   const navigate = useNavigate();
-  const { overview, loading, error } = useDashboard();
+  const { overview, loading, error, refresh } = useDashboard();
 
   if (loading) {
     return (
@@ -89,6 +89,35 @@ export const DashboardPage = () => {
             <SkeletonStatCard />
           </div>
           <SkeletonList count={3} />
+        </PageSection>
+      </PageShell>
+    );
+  }
+
+  if (error && !overview) {
+    return (
+      <PageShell>
+        <PageSection>
+          <header>
+            <Heading level="h1">Dashboard</Heading>
+            <Text variant="body" color="muted" className="mt-2">
+              Overview of your GPA, upcoming deadlines, and focus for the week.
+            </Text>
+          </header>
+          <Card variant="default" padding="md" className="border-error-500/30 bg-error-500/5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-error-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-error-200">Failed to load dashboard</p>
+                  <p className="mt-1 text-xs text-slate-400">{error}</p>
+                </div>
+              </div>
+              <Button size="sm" variant="primary" onClick={() => refresh()}>
+                Try again
+              </Button>
+            </div>
+          </Card>
         </PageSection>
       </PageShell>
     );
@@ -348,19 +377,6 @@ export const DashboardPage = () => {
             </motion.div>
           </div>
 
-          {/* Show subtle error banner if there was an error but we have mock data */}
-          {error && overview && (
-            <motion.div variants={fadeInUp}>
-              <Card variant="default" padding="sm" className="border-warning-500/30 bg-warning-500/5 shadow-elevation-low">
-                <div className="flex items-center gap-3">
-                  <AlertCircle className="h-5 w-5 text-warning-400 shrink-0" />
-                  <Text variant="small" className="text-warning-300">
-                    Unable to connect to server. Showing sample data for demonstration.
-                  </Text>
-                </div>
-              </Card>
-            </motion.div>
-          )}
         </PageSection>
       </motion.div>
     </PageShell>

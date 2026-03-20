@@ -1,37 +1,10 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { X, Search, BookOpen, FileText, CheckSquare } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, Search, BookOpen, FileText, CheckSquare, Loader2 } from "lucide-react";
 import { Modal } from "../core/Modal";
 import { Button } from "../core/Button";
 import { Badge } from "../core/Badge";
 import { Input } from "../core/Input";
-import type { Course, Assignment, Task } from "../../api/plannerApi";
-
-/**
- * Mock data for context attachment
- * In production, this would come from the planner API
- */
-
-const mockCourses: Course[] = [
-  { id: 1, user: 1, name: "Data Structures", code: "CS 301", term: "Fall 2024", credits: 3 },
-  { id: 2, user: 1, name: "Algorithms", code: "CS 302", term: "Fall 2024", credits: 3 },
-  { id: 3, user: 1, name: "Database Systems", code: "CS 401", term: "Fall 2024", credits: 3 },
-  { id: 4, user: 1, name: "Web Development", code: "CS 350", term: "Fall 2024", credits: 3 },
-];
-
-const mockAssignments: Assignment[] = [
-  { id: 1, course: 1, title: "Homework 3: Binary Trees", description: "", due_at: "2024-11-25", status: "pending", weight: 10, type: "homework" },
-  { id: 2, course: 2, title: "Project: Sorting Visualizer", description: "", due_at: "2024-11-30", status: "in_progress", weight: 25, type: "project" },
-  { id: 3, course: 3, title: "Midterm Exam", description: "", due_at: "2024-11-28", status: "pending", weight: 30, type: "exam" },
-  { id: 4, course: 4, title: "Final Project Proposal", description: "", due_at: "2024-12-05", status: "pending", weight: 15, type: "project" },
-];
-
-const mockTasks: Task[] = [
-  { id: 1, user: 1, assignment: 1, title: "Implement BST insert method", description: "", due_at: "2024-11-24", status: "in_progress", priority: "high" },
-  { id: 2, user: 1, assignment: 2, title: "Design sorting algorithm UI", description: "", due_at: "2024-11-26", status: "pending", priority: "medium" },
-  { id: 3, user: 1, assignment: 3, title: "Review SQL joins and indexing", description: "", due_at: "2024-11-27", status: "pending", priority: "high" },
-  { id: 4, user: 1, assignment: null, title: "Read Chapter 5", description: "", due_at: "2024-11-23", status: "pending", priority: "low" },
-];
+import { plannerApi, type Course, type Assignment, type Task } from "../../api/plannerApi";
 
 type TabType = "courses" | "assignments" | "tasks";
 
@@ -69,11 +42,36 @@ interface AttachContextModalProps {
 export const AttachContextModal = ({ isOpen, onClose, onAttach }: AttachContextModalProps) => {
   const [activeTab, setActiveTab] = useState<TabType>("courses");
   const [searchQuery, setSearchQuery] = useState("");
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<SelectedContext>({
     courses: [],
     assignments: [],
     tasks: [],
   });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setLoadError(null);
+    setLoading(true);
+    Promise.all([
+      plannerApi.listCourses(),
+      plannerApi.listAssignments(),
+      plannerApi.listTasks(),
+    ])
+      .then(([c, a, t]) => {
+        setCourses(c);
+        setAssignments(a);
+        setTasks(t);
+      })
+      .catch((err: any) => {
+        setLoadError(err?.response?.data?.detail || "Failed to load items.");
+      })
+      .finally(() => setLoading(false));
+  }, [isOpen]);
 
   const handleToggleItem = (type: TabType, id: number) => {
     setSelected((prev) => ({
@@ -102,34 +100,50 @@ export const AttachContextModal = ({ isOpen, onClose, onAttach }: AttachContextM
 
   const getFilteredItems = () => {
     const query = searchQuery.toLowerCase();
-    
     switch (activeTab) {
       case "courses":
-        return mockCourses.filter(
+        return courses.filter(
           (course) =>
             course.name.toLowerCase().includes(query) ||
             course.code.toLowerCase().includes(query)
         );
       case "assignments":
-        return mockAssignments.filter((assignment) =>
-          assignment.title.toLowerCase().includes(query)
-        );
+        return assignments.filter((a) => a.title.toLowerCase().includes(query));
       case "tasks":
-        return mockTasks.filter((task) =>
-          task.title.toLowerCase().includes(query)
-        );
+        return tasks.filter((t) => t.title.toLowerCase().includes(query));
       default:
         return [];
     }
   };
 
   const renderTabContent = () => {
+    if (loading) {
+      return (
+        <div className="flex h-64 items-center justify-center text-slate-400">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      );
+    }
+    if (loadError) {
+      return (
+        <div className="flex h-64 items-center justify-center text-error-400">
+          <p className="text-sm">{loadError}</p>
+        </div>
+      );
+    }
     const items = getFilteredItems();
-
     if (items.length === 0) {
       return (
         <div className="flex h-64 items-center justify-center text-slate-500">
-          <p className="text-sm">No items found</p>
+          <p className="text-sm">
+            {courses.length === 0 && activeTab === "courses"
+              ? "Add courses in Planner to attach them here."
+              : assignments.length === 0 && activeTab === "assignments"
+              ? "Add assignments to your courses to see them here."
+              : tasks.length === 0 && activeTab === "tasks"
+              ? "Add tasks to see them here."
+              : "No items match your search."}
+          </p>
         </div>
       );
     }

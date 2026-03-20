@@ -12,12 +12,9 @@ import {
 import clsx from "clsx";
 import { Card } from "../core/Card";
 
-/**
- * Mock data for context cards
- * In production, this would come from the dashboard API
- */
+/** Data for context cards (from dashboard API) */
 
-interface NextExamData {
+export interface NextExamData {
   courseName: string;
   examTitle: string;
   date: string;
@@ -25,37 +22,17 @@ interface NextExamData {
   type: string;
 }
 
-interface WeeklyTasksData {
+export interface WeeklyTasksData {
   completed: number;
   total: number;
   percentage: number;
 }
 
-interface GpaTrendData {
+export interface GpaTrendData {
   currentGpa: number;
   previousGpa: number;
   trend: "up" | "down" | "stable";
 }
-
-const mockNextExam: NextExamData = {
-  courseName: "CS 301",
-  examTitle: "Midterm Exam",
-  date: "2024-11-28",
-  daysUntil: 7,
-  type: "Midterm",
-};
-
-const mockWeeklyTasks: WeeklyTasksData = {
-  completed: 8,
-  total: 12,
-  percentage: 67,
-};
-
-const mockGpaTrend: GpaTrendData = {
-  currentGpa: 3.72,
-  previousGpa: 3.65,
-  trend: "up",
-};
 
 type Accent = "primary" | "secondary" | "accent";
 
@@ -227,246 +204,145 @@ const ContextCardHeader = ({
   </div>
 );
 
+const EmptyCardMessage = ({ children }: { children: ReactNode }) => (
+  <p className="text-xs text-slate-500 italic">{children}</p>
+);
+
 /**
- * NextExamCard - Shows upcoming exam with countdown
+ * NextExamCard - Shows upcoming exam with countdown (from dashboard data)
  */
-export const NextExamCard = () => {
-  const exam = mockNextExam;
-  const examDate = new Date(exam.date);
+export const NextExamCard = ({ nextExam }: { nextExam?: NextExamData | null }) => {
+  if (!nextExam) {
+    return (
+      <ContextCardFrame accent="primary">
+        <ContextCardHeader
+          accent="primary"
+          title="Next exam"
+          subtitle="Upcoming"
+          icon={<Calendar className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />}
+        />
+        <EmptyCardMessage>Add courses and assignments to see your next exam.</EmptyCardMessage>
+      </ContextCardFrame>
+    );
+  }
+  const examDate = new Date(nextExam.date);
   const formattedDate = examDate.toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
   });
-  const prepCoverage = Math.min(92, Math.max(18, 100 - exam.daysUntil * 7));
+  const prepCoverage = Math.min(92, Math.max(18, 100 - nextExam.daysUntil * 7));
 
   return (
     <ContextCardFrame accent="primary">
       <ContextCardHeader
         accent="primary"
         title="Next exam"
-        subtitle={exam.courseName}
-        icon={
-          <Calendar className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />
-        }
+        subtitle={nextExam.courseName}
+        icon={<Calendar className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />}
       />
       <MetadataRow
         items={[
-          {
-            icon: (
-              <Target
-                className="h-3.5 w-3.5"
-                strokeWidth={1.8}
-                aria-hidden="true"
-              />
-            ),
-            label: exam.examTitle,
-          },
-          {
-            icon: (
-              <Calendar
-                className="h-3.5 w-3.5"
-                strokeWidth={1.8}
-                aria-hidden="true"
-              />
-            ),
-            label: formattedDate,
-          },
-          {
-            icon: (
-              <Clock
-                className="h-3.5 w-3.5"
-                strokeWidth={1.8}
-                aria-hidden="true"
-              />
-            ),
-            label: `${exam.daysUntil} days`,
-          },
+          { icon: <Target className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />, label: nextExam.examTitle },
+          { icon: <Calendar className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />, label: formattedDate },
+          { icon: <Clock className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />, label: `${nextExam.daysUntil} days` },
         ]}
       />
-      <PrimaryMetric
-        value={String(exam.daysUntil)}
-        suffix="days left"
-        descriptor="Schedule 3 focused blocks before Monday"
-      />
-      <ProgressBar
-        accent="primary"
-        label="Prep coverage"
-        value={prepCoverage}
-        hint={`${Math.round(prepCoverage)}% ready`}
-      />
-      <InsightLine>Best recall window: Thu 3-5p.</InsightLine>
+      <PrimaryMetric value={String(nextExam.daysUntil)} suffix="days left" descriptor={`${nextExam.type} · ${nextExam.examTitle}`} />
+      <ProgressBar accent="primary" label="Prep coverage" value={prepCoverage} hint={`${Math.round(prepCoverage)}% ready`} />
+      <InsightLine>Schedule focused study blocks before the exam.</InsightLine>
     </ContextCardFrame>
   );
 };
 
 /**
- * WeeklyTasksCard - Shows task completion progress
+ * WeeklyTasksCard - Shows task completion progress (from dashboard data)
  */
-export const WeeklyTasksCard = () => {
-  const tasks = mockWeeklyTasks;
-  const remaining = Math.max(0, tasks.total - tasks.completed);
-
+export const WeeklyTasksCard = ({ weeklyTasks }: { weeklyTasks?: WeeklyTasksData | null }) => {
+  if (!weeklyTasks || (weeklyTasks.total === 0 && weeklyTasks.completed === 0)) {
+    return (
+      <ContextCardFrame accent="secondary">
+        <ContextCardHeader
+          accent="secondary"
+          title="Execution pulse"
+          subtitle="This week"
+          icon={<CheckCircle2 className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />}
+        />
+        <EmptyCardMessage>Add tasks to track your weekly progress.</EmptyCardMessage>
+      </ContextCardFrame>
+    );
+  }
+  const remaining = Math.max(0, weeklyTasks.total - weeklyTasks.completed);
   return (
     <ContextCardFrame accent="secondary">
       <ContextCardHeader
         accent="secondary"
         title="Execution pulse"
-        subtitle={`${tasks.total} tasks on deck`}
-        icon={
-          <CheckCircle2
-            className="h-4 w-4"
-            strokeWidth={1.8}
-            aria-hidden="true"
-          />
-        }
+        subtitle={`${weeklyTasks.total} tasks on deck`}
+        icon={<CheckCircle2 className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />}
       />
       <MetadataRow
         items={[
-          {
-            icon: (
-              <CheckCircle2
-                className="h-3.5 w-3.5"
-                strokeWidth={1.8}
-                aria-hidden="true"
-              />
-            ),
-            label: `${tasks.completed} done`,
-          },
-          {
-            icon: (
-              <Activity
-                className="h-3.5 w-3.5"
-                strokeWidth={1.8}
-                aria-hidden="true"
-              />
-            ),
-            label: `${remaining} remaining`,
-          },
-          {
-            icon: (
-              <Calendar
-                className="h-3.5 w-3.5"
-                strokeWidth={1.8}
-                aria-hidden="true"
-              />
-            ),
-            label: "Next checkpoint Fri",
-          },
+          { icon: <CheckCircle2 className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />, label: `${weeklyTasks.completed} done` },
+          { icon: <Activity className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />, label: `${remaining} remaining` },
         ]}
       />
-      <PrimaryMetric
-        value={String(tasks.percentage)}
-        suffix="% focus"
-        descriptor={`${tasks.completed}/${tasks.total} complete`}
-      />
-      <ProgressBar
-        accent="secondary"
-        label="Execution"
-        value={tasks.percentage}
-        hint={`${tasks.completed}/${tasks.total}`}
-      />
-      <InsightLine>Best focus: Thu afternoon.</InsightLine>
+      <PrimaryMetric value={String(weeklyTasks.percentage)} suffix="% focus" descriptor={`${weeklyTasks.completed}/${weeklyTasks.total} complete`} />
+      <ProgressBar accent="secondary" label="Execution" value={weeklyTasks.percentage} hint={`${weeklyTasks.completed}/${weeklyTasks.total}`} />
+      <InsightLine>Keep completing tasks to build momentum.</InsightLine>
     </ContextCardFrame>
   );
 };
 
 /**
- * GpaTrendCard - Shows current GPA with trend indicator
+ * GpaTrendCard - Shows current GPA with trend indicator (from dashboard data)
  */
-export const GpaTrendCard = () => {
-  const gpa = mockGpaTrend;
-  const targetGpa = 3.8;
-  const delta = gpa.currentGpa - gpa.previousGpa;
-  const trendLabel =
-    gpa.trend === "stable"
-      ? "stable"
-      : `${delta > 0 ? "+" : ""}${Math.abs(delta).toFixed(2)}`;
-  const progressToGoal = Math.min(
-    100,
-    Math.max(0, (gpa.currentGpa / 4) * 100)
-  );
+export const GpaTrendCard = ({ gpaTrend, targetGpa }: { gpaTrend?: GpaTrendData | null; targetGpa?: number | null }) => {
+  if (!gpaTrend) {
+    return (
+      <ContextCardFrame accent="accent">
+        <ContextCardHeader
+          accent="accent"
+          title="Current GPA"
+          subtitle="Profile"
+          icon={<TrendingUp className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />}
+        />
+        <EmptyCardMessage>Set your GPA in Profile to see trends.</EmptyCardMessage>
+      </ContextCardFrame>
+    );
+  }
+  const goal = targetGpa ?? 3.8;
+  const delta = gpaTrend.currentGpa - gpaTrend.previousGpa;
+  const trendLabel = gpaTrend.trend === "stable" ? "stable" : `${delta > 0 ? "+" : ""}${Math.abs(delta).toFixed(2)}`;
+  const progressToGoal = Math.min(100, Math.max(0, (gpaTrend.currentGpa / 4) * 100));
 
-  const trendIcon = (() => {
-    switch (gpa.trend) {
-      case "up":
-        return (
-          <TrendingUp
-            className="h-3.5 w-3.5 text-secondary-300"
-            strokeWidth={1.8}
-            aria-hidden="true"
-          />
-        );
-      case "down":
-        return (
-          <TrendingDown
-            className="h-3.5 w-3.5 text-warning-400"
-            strokeWidth={1.8}
-            aria-hidden="true"
-          />
-        );
-      default:
-        return (
-          <Minus
-            className="h-3.5 w-3.5 text-slate-400"
-            strokeWidth={1.8}
-            aria-hidden="true"
-          />
-        );
-    }
-  })();
+  const trendIcon =
+    gpaTrend.trend === "up" ? (
+      <TrendingUp className="h-3.5 w-3.5 text-secondary-300" strokeWidth={1.8} aria-hidden="true" />
+    ) : gpaTrend.trend === "down" ? (
+      <TrendingDown className="h-3.5 w-3.5 text-warning-400" strokeWidth={1.8} aria-hidden="true" />
+    ) : (
+      <Minus className="h-3.5 w-3.5 text-slate-400" strokeWidth={1.8} aria-hidden="true" />
+    );
 
   return (
     <ContextCardFrame accent="accent">
       <ContextCardHeader
         accent="accent"
         title="Current GPA"
-        subtitle="Rolling 6-week average"
-        icon={
-          <TrendingUp
-            className="h-4 w-4"
-            strokeWidth={1.8}
-            aria-hidden="true"
-          />
-        }
+        subtitle="Rolling average"
+        icon={<TrendingUp className="h-4 w-4" strokeWidth={1.8} aria-hidden="true" />}
       />
       <MetadataRow
         items={[
-          { icon: trendIcon, label: `${trendLabel} vs last term` },
-          {
-            icon: (
-              <Target
-                className="h-3.5 w-3.5"
-                strokeWidth={1.8}
-                aria-hidden="true"
-              />
-            ),
-            label: `Goal ${targetGpa.toFixed(2)}`,
-          },
-          {
-            icon: (
-              <Clock
-                className="h-3.5 w-3.5"
-                strokeWidth={1.8}
-                aria-hidden="true"
-              />
-            ),
-            label: `Prev ${gpa.previousGpa.toFixed(2)}`,
-          },
+          { icon: trendIcon, label: `${trendLabel} vs previous` },
+          { icon: <Target className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />, label: `Goal ${goal.toFixed(2)}` },
+          { icon: <Clock className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden="true" />, label: `Prev ${gpaTrend.previousGpa.toFixed(2)}` },
         ]}
       />
-      <PrimaryMetric
-        value={gpa.currentGpa.toFixed(2)}
-        suffix="GPA"
-        descriptor="Updated this week"
-      />
-      <ProgressBar
-        accent="accent"
-        label="Toward term goal"
-        value={progressToGoal}
-        hint={`${targetGpa.toFixed(2)} goal`}
-      />
-      <InsightLine>Keep labs above A- to secure the 3.8 target.</InsightLine>
+      <PrimaryMetric value={gpaTrend.currentGpa.toFixed(2)} suffix="GPA" descriptor="From profile" />
+      <ProgressBar accent="accent" label="Toward term goal" value={progressToGoal} hint={`${goal.toFixed(2)} goal`} />
+      <InsightLine>Update your GPA in Profile to keep trends accurate.</InsightLine>
     </ContextCardFrame>
   );
 };

@@ -28,6 +28,7 @@ export const SidebarNavItem = ({ to, label, icon, onClick }: SidebarNavItemProps
   
   return (
     <NavLink
+      data-sidebar-nav-link="true"
       to={to}
       onClick={onClick}
       title={isCollapsed ? label : undefined}

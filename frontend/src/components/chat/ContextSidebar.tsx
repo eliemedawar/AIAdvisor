@@ -1,8 +1,16 @@
-import { useState, useEffect, ReactNode } from "react";
+import { useState, useEffect, ReactNode, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, ChevronLeft } from "lucide-react";
-import { NextExamCard, WeeklyTasksCard, GpaTrendCard } from "./ContextCards";
+import {
+  NextExamCard,
+  WeeklyTasksCard,
+  GpaTrendCard,
+  type NextExamData,
+  type WeeklyTasksData,
+  type GpaTrendData,
+} from "./ContextCards";
 import { useBreakpoint } from "../../hooks/useBreakpoint";
+import { useDashboard } from "../../hooks/useDashboard";
 
 interface ContextSidebarProps {
   className?: string;
@@ -36,21 +44,62 @@ const ContextSection = ({ label, caption, children }: ContextSectionProps) => (
   </section>
 );
 
-const ContextStack = () => (
-  <div className="flex flex-col gap-6">
-    <ContextSection label="Next exam" caption="Countdown & prep">
-      <NextExamCard />
-    </ContextSection>
-    <ContextDivider />
-    <ContextSection label="This week's focus" caption="Tasks & energy">
-      <WeeklyTasksCard />
-    </ContextSection>
-    <ContextDivider />
-    <ContextSection label="Current GPA" caption="Rolling trend">
-      <GpaTrendCard />
-    </ContextSection>
-  </div>
-);
+function deriveNextExam(overview: { upcoming_deadlines?: Array<{ course_name?: string; title: string; due_at: string; type: string }> }): NextExamData | null {
+  const list = overview?.upcoming_deadlines;
+  if (!list?.length) return null;
+  const a = list[0];
+  const due = new Date(a.due_at);
+  const now = new Date();
+  const daysUntil = Math.max(0, Math.ceil((due.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)));
+  return {
+    courseName: a.course_name ?? "—",
+    examTitle: a.title,
+    date: a.due_at,
+    daysUntil,
+    type: a.type,
+  };
+}
+
+function deriveWeeklyTasks(overview: { weekly_task_stats?: Array<{ completed: number; planned: number }> }): WeeklyTasksData | null {
+  const stats = overview?.weekly_task_stats;
+  if (!stats?.length) return null;
+  const completed = stats.reduce((s, d) => s + d.completed, 0);
+  const total = stats.reduce((s, d) => s + d.planned, 0);
+  if (total === 0 && completed === 0) return null;
+  return { completed, total, percentage: total ? Math.round((completed / total) * 100) : 0 };
+}
+
+function deriveGpaTrend(overview: { current_gpa?: number | null; gpa_trend?: Array<{ gpa: number }> }): GpaTrendData | null {
+  const current = overview?.current_gpa;
+  if (current == null) return null;
+  const trend = overview?.gpa_trend ?? [];
+  const previous = trend.length >= 2 ? trend[trend.length - 2].gpa : current;
+  const trendDir: "up" | "down" | "stable" =
+    current > previous ? "up" : current < previous ? "down" : "stable";
+  return { currentGpa: current, previousGpa: previous, trend: trendDir };
+}
+
+const ContextStack = () => {
+  const { overview } = useDashboard();
+  const nextExam = useMemo(() => (overview ? deriveNextExam(overview) : null), [overview]);
+  const weeklyTasks = useMemo(() => (overview ? deriveWeeklyTasks(overview) : null), [overview]);
+  const gpaTrend = useMemo(() => (overview ? deriveGpaTrend(overview) : null), [overview]);
+  return (
+    <div className="flex flex-col gap-6">
+      <ContextSection label="Next exam" caption="Countdown & prep">
+        <NextExamCard nextExam={nextExam} />
+      </ContextSection>
+      <ContextDivider />
+      <ContextSection label="This week's focus" caption="Tasks & energy">
+        <WeeklyTasksCard weeklyTasks={weeklyTasks} />
+      </ContextSection>
+      <ContextDivider />
+      <ContextSection label="Current GPA" caption="Rolling trend">
+        <GpaTrendCard gpaTrend={gpaTrend} />
+      </ContextSection>
+    </div>
+  );
+};
 
 export const ContextSidebarContent = ContextStack;
 

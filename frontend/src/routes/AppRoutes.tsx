@@ -11,6 +11,7 @@ const SignUpPage = lazy(() => import("../pages/auth/SignUpPage").then(m => ({ de
 const DashboardPage = lazy(() => import("../pages/dashboard/DashboardPage").then(m => ({ default: m.DashboardPage })));
 const ChatPage = lazy(() => import("../pages/chat/ChatPage").then(m => ({ default: m.ChatPage })));
 const CalendarPage = lazy(() => import("../pages/calendar/CalendarPage").then(m => ({ default: m.CalendarPage })));
+const PlannerPage = lazy(() => import("../pages/planner/PlannerPage").then(m => ({ default: m.PlannerPage })));
 const ProfilePage = lazy(() => import("../pages/profile/ProfilePage").then(m => ({ default: m.ProfilePage })));
 const NotFoundPage = lazy(() => import("../pages/errors/NotFoundPage").then(m => ({ default: m.NotFoundPage })));
 
@@ -44,6 +45,7 @@ export const AppRoutes = () => {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/chat" element={<ChatPage />} />
             <Route path="/calendar" element={<CalendarPage />} />
+            <Route path="/planner" element={<PlannerPage />} />
             <Route path="/profile" element={<ProfilePage />} />
           </Route>
         </Route>
