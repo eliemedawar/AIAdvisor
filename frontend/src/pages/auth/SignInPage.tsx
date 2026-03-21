@@ -1,131 +1,246 @@
-import { FormEvent, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Input, Button } from "../../components";
-import { useAuth } from "../../hooks/useAuth";
+import { useState, FormEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Mail, Lock, ArrowRight, Sparkles } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
 
-export const SignInPage = () => {
+export function SignInPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const from = (location.state as { from?: Location })?.from?.pathname || "/dashboard";
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [emailError, setEmailError] = useState<string>("");
-  const [passwordError, setPasswordError] = useState<string>("");
-  const [touched, setTouched] = useState({ email: false, password: false });
-
-  const validateEmail = (value: string): string => {
-    if (!value) return "Email is required";
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(value)) return "Please enter a valid email address";
-    return "";
-  };
-
-  const validatePassword = (value: string): string => {
-    if (!value) return "Password is required";
-    if (value.length < 6) return "Password must be at least 6 characters";
-    return "";
-  };
-
-  const handleEmailChange = (value: string) => {
-    setEmail(value);
-    if (touched.email) {
-      setEmailError(validateEmail(value));
-    }
-  };
-
-  const handlePasswordChange = (value: string) => {
-    setPassword(value);
-    if (touched.password) {
-      setPasswordError(validatePassword(value));
-    }
-  };
-
-  const handleEmailBlur = () => {
-    setTouched(prev => ({ ...prev, email: true }));
-    setEmailError(validateEmail(email));
-  };
-
-  const handlePasswordBlur = () => {
-    setTouched(prev => ({ ...prev, password: true }));
-    setPasswordError(validatePassword(password));
-  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    
-    // Validate all fields
-    const emailErr = validateEmail(email);
-    const passwordErr = validatePassword(password);
-    
-    setEmailError(emailErr);
-    setPasswordError(passwordErr);
-    setTouched({ email: true, password: true });
-    
-    if (emailErr || passwordErr) {
-      return;
-    }
-
-    setError(null);
+    setError('');
     setLoading(true);
     try {
       await login({ email, password });
-      navigate(from, { replace: true });
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || "Unable to sign in. Check your credentials.");
+      navigate('/dashboard');
+    } catch {
+      setError('Invalid credentials.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-4">
-        <Input
-          label="University email"
-          type="email"
-          name="email"
-          autoComplete="email"
-          required
-          value={email}
-          onChange={(e) => handleEmailChange(e.target.value)}
-          onBlur={handleEmailBlur}
-          error={touched.email ? emailError : ""}
+    <div className="min-h-screen flex relative overflow-hidden" style={{ background: '#070A13' }}>
+      {/* Animated background layers */}
+      <motion.div
+        aria-hidden="true"
+        className="absolute inset-0"
+        style={{
+          background: 'radial-gradient(1200px 800px at 20% 10%, rgba(108,99,255,0.20), transparent 60%), radial-gradient(900px 700px at 85% 80%, rgba(0,210,200,0.14), transparent 60%)'
+        }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 1.2, ease: 'easeOut' }}
+      />
+      <motion.div
+        aria-hidden="true"
+        className="absolute -inset-24 blur-3xl"
+        style={{
+          background: 'conic-gradient(from 180deg at 50% 50%, rgba(108,99,255,0.12), rgba(0,210,200,0.10), rgba(108,99,255,0.12))'
+        }}
+        animate={{ rotate: 360 }}
+        transition={{ duration: 40, ease: 'linear', repeat: Infinity }}
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0"
+        style={{
+          backgroundImage: 'radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px)',
+          backgroundSize: '22px 22px',
+          opacity: 0.2
+        }}
+      />
+
+      {/* ── Left hero panel (desktop only) ────────────────────────── */}
+      <div className="hidden lg:flex lg:w-1/2 relative flex-col items-start justify-center p-16 overflow-hidden">
+        {/* Ambient blobs */}
+        <motion.div
+          className="absolute top-1/4 left-1/3 w-80 h-80 rounded-full blur-3xl"
+          style={{ background: 'rgba(108,99,255,0.16)' }}
+          animate={{ x: [0, 18, -12, 0], y: [0, -10, 12, 0] }}
+          transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
         />
-        <Input
-          label="Password"
-          type="password"
-          name="password"
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={(e) => handlePasswordChange(e.target.value)}
-          onBlur={handlePasswordBlur}
-          error={touched.password ? passwordError : ""}
+        <motion.div
+          className="absolute bottom-1/4 right-1/4 w-56 h-56 rounded-full blur-3xl"
+          style={{ background: 'rgba(0,210,200,0.12)' }}
+          animate={{ x: [0, -14, 10, 0], y: [0, 12, -8, 0] }}
+          transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }}
         />
-      </div>
-      {error && (
-        <div className="rounded-xl border border-danger-500/60 bg-danger-500/10 px-4 py-3 text-sm text-danger-200">
-          {error}
-        </div>
-      )}
-      <Button type="submit" className="w-full" loading={loading}>
-        Sign in
-      </Button>
-      <p className="text-center text-xs text-slate-400">
-        Don&apos;t have an account?{" "}
-        <Link
-          to="/auth/sign-up"
-          className="font-medium text-primary-300 hover:text-primary-200"
+
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, ease: 'easeOut' }}
+          className="relative z-10 max-w-md"
         >
-          Create one
-        </Link>
-      </p>
-    </form>
+          {/* Logo */}
+          <div className="flex items-center gap-3 mb-12">
+            <motion.div
+              className="w-10 h-10 rounded-2xl flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg,#6C63FF,#00D2C8)', boxShadow: '0 0 24px rgba(108,99,255,0.45)' }}
+              animate={{ rotate: [0, 2, -2, 0] }}
+              transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              <Sparkles className="w-5 h-5 text-white" />
+            </motion.div>
+            <span className="font-bold text-xl text-white" style={{ fontFamily: 'Syne, sans-serif' }}>AI Advisor</span>
+          </div>
+
+          <h1 className="font-bold leading-tight text-white mb-5" style={{ fontFamily: 'Syne, sans-serif', fontSize: '3rem' }}>
+            Your academic
+            <span className="block" style={{ background: 'linear-gradient(135deg,#6C63FF,#00D2C8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+              co-pilot.
+            </span>
+          </h1>
+
+          <p className="text-base leading-relaxed mb-12" style={{ color: 'rgba(255,255,255,0.45)' }}>
+            Intelligent guidance for deadlines, study plans, and course decisions — all in one place.
+          </p>
+
+          <div className="flex flex-col gap-4">
+            {['AI-powered chat advisor', 'Smart deadline tracking', 'Personalised study plans'].map((f, i) => (
+              <motion.div key={f} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 + i * 0.1 }}
+                className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'rgba(108,99,255,0.15)', border: '1px solid rgba(108,99,255,0.35)' }}>
+                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#6C63FF' }} />
+                </div>
+                <span className="text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>{f}</span>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      </div>
+
+      {/* ── Right form panel ───────────────────────────────────────── */}
+      <div className="flex-1 flex items-center justify-center p-6 lg:p-16">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="w-full max-w-sm relative"
+        >
+          <motion.div
+            aria-hidden="true"
+            className="absolute -inset-6 rounded-3xl pointer-events-none"
+            style={{ background: 'linear-gradient(135deg, rgba(108,99,255,0.10), rgba(0,210,200,0.06))', border: '1px solid rgba(255,255,255,0.05)' }}
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+          />
+          <div className="relative">
+          <motion.div
+            aria-hidden="true"
+            className="absolute -top-6 -right-4 w-20 h-20 rounded-full blur-2xl pointer-events-none"
+            style={{ background: 'rgba(108,99,255,0.18)' }}
+            animate={{ y: [0, 8, -6, 0] }}
+            transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          <motion.div
+            aria-hidden="true"
+            className="absolute -bottom-4 -left-6 w-24 h-24 rounded-full blur-2xl pointer-events-none"
+            style={{ background: 'rgba(0,210,200,0.12)' }}
+            animate={{ y: [0, -8, 6, 0] }}
+            transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          {/* Mobile logo */}
+          <div className="lg:hidden flex items-center gap-2 mb-10">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#6C63FF,#00D2C8)' }}>
+              <Sparkles className="w-4 h-4 text-white" />
+            </div>
+            <span className="font-bold text-white" style={{ fontFamily: 'Syne, sans-serif' }}>AI Advisor</span>
+          </div>
+
+          <div className="mb-10">
+            <h2 className="font-bold text-white mb-2" style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.75rem' }}>Welcome back</h2>
+            <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Sign in to continue your academic journey</p>
+          </div>
+
+          <form onSubmit={handleSubmit}>
+            <div className="flex flex-col gap-8 mb-8">
+              {/* Email */}
+              <div>
+                <label className="block text-xs font-medium mb-3 uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.4)' }}>Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(255,255,255,0.25)' }} />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="you@university.edu"
+                    required
+                    className="w-full bg-transparent pl-7 pb-2 text-sm text-white outline-none placeholder:text-white/25 transition-colors"
+                    style={{ borderBottom: '1px solid rgba(255,255,255,0.15)' }}
+                    onFocus={e => (e.target.style.borderBottomColor = '#6C63FF')}
+                    onBlur={e => (e.target.style.borderBottomColor = 'rgba(255,255,255,0.15)')}
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-xs font-medium mb-3 uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.4)' }}>Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(255,255,255,0.25)' }} />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    className="w-full bg-transparent pl-7 pb-2 text-sm text-white outline-none placeholder:text-white/25 transition-colors"
+                    style={{ borderBottom: '1px solid rgba(255,255,255,0.15)' }}
+                    onFocus={e => (e.target.style.borderBottomColor = '#6C63FF')}
+                    onBlur={e => (e.target.style.borderBottomColor = 'rgba(255,255,255,0.15)')}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Error */}
+            {error && (
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                className="text-xs mb-6 p-3 rounded-xl" style={{ color: '#fb7185', background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.2)' }}>
+                {error}
+              </motion.p>
+            )}
+
+            {/* Submit */}
+            <motion.button
+              type="submit"
+              disabled={loading}
+              whileHover={{ scale: loading ? 1 : 1.02, boxShadow: loading ? undefined : '0 0 30px rgba(108,99,255,0.5)' }}
+              whileTap={{ scale: loading ? 1 : 0.98 }}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-full text-sm font-semibold text-white transition-all"
+              style={{ background: 'linear-gradient(135deg,#6C63FF,#5b52e0)', boxShadow: '0 0 20px rgba(108,99,255,0.3)', opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}
+            >
+              {loading
+                ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : <><span>Sign in</span><ArrowRight className="w-4 h-4" /></>}
+            </motion.button>
+          </form>
+
+          <p className="mt-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.35)' }}>
+            No account?{' '}
+            <Link to="/auth/sign-up" className="font-medium transition-colors" style={{ color: '#6C63FF' }}
+              onMouseEnter={e => ((e.target as HTMLElement).style.color = '#818cf8')}
+              onMouseLeave={e => ((e.target as HTMLElement).style.color = '#6C63FF')}>
+              Create one
+            </Link>
+          </p>
+          </div>
+        </motion.div>
+      </div>
+    </div>
   );
-};
+}
 
-
+// Named export alias
+export const SignInPage$ = SignInPage;

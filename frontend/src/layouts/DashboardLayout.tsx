@@ -178,9 +178,51 @@ export const DashboardLayout = () => {
           className="relative flex-1 min-h-0 overflow-hidden border-t border-slate-900/40 lg:border-t-0 lg:border-l lg:border-slate-900/50"
         >
           {/* Animated Background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-bg via-slate-900 to-bg" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary-900/10 via-transparent to-transparent" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-accent-900/5 via-transparent to-transparent" />
+          <motion.div
+            aria-hidden="true"
+            className="absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(1200px 700px at 12% -10%, rgba(108,99,255,0.22), transparent 60%), radial-gradient(1000px 700px at 88% 110%, rgba(0,210,200,0.12), transparent 60%)",
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1.1, ease: "easeOut" }}
+          />
+          <motion.div
+            aria-hidden="true"
+            className="absolute -inset-32 blur-3xl opacity-70"
+            style={{
+              background:
+                "conic-gradient(from 180deg at 50% 50%, rgba(108,99,255,0.12), rgba(0,210,200,0.10), rgba(108,99,255,0.12))",
+            }}
+            animate={{ rotate: 360 }}
+            transition={{ duration: 60, ease: "linear", repeat: Infinity }}
+          />
+          <div
+            aria-hidden="true"
+            className="absolute inset-0"
+            style={{
+              backgroundImage:
+                "radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)",
+              backgroundSize: "24px 24px",
+              opacity: 0.2,
+            }}
+          />
+          <motion.div
+            aria-hidden="true"
+            className="absolute left-[-10%] top-[20%] h-[28rem] w-[28rem] rounded-full blur-3xl"
+            style={{ background: "rgba(108,99,255,0.12)" }}
+            animate={{ x: [0, 18, -12, 0], y: [0, -10, 12, 0] }}
+            transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.div
+            aria-hidden="true"
+            className="absolute right-[-6%] bottom-[10%] h-[24rem] w-[24rem] rounded-full blur-3xl"
+            style={{ background: "rgba(0,210,200,0.10)" }}
+            animate={{ x: [0, -12, 10, 0], y: [0, 10, -8, 0] }}
+            transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+          />
 
           {/* Content with AnimatePresence for smooth page transitions */}
           <div

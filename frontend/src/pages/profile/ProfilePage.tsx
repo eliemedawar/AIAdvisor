@@ -1,227 +1,234 @@
-import { FormEvent, useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import {
-  GraduationCap,
-  TrendingUp,
-  BookOpen,
-  AlertCircle
-} from "lucide-react";
-import {
-  PageShell,
-  PageSection,
-  Heading,
-  Text,
-  Card,
-  SectionHeader,
-  StatCard,
-  Avatar,
-  Input,
-  Button,
-  SkeletonCard,
-} from "../../components";
-import { useAuth } from "../../hooks/useAuth";
-import { useProfile } from "../../hooks/useProfile";
-import { useToast } from "../../context/ToastContext";
+import React, { useState, useEffect, FormEvent } from 'react';
+import { GraduationCap, TrendingUp, BookOpen, AlertCircle, Loader2 } from 'lucide-react';
+import { AppLayout } from '../../layouts/AppLayout';
+import { Card } from '../../components/ui/Card';
+import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { useAuth } from '../../hooks/useAuth';
+import { useProfile } from '../../hooks/useProfile';
+import { useToast } from '../../context/ToastContext';
 
-const fadeInUp = {
-  initial: { opacity: 0, y: 20 },
-  animate: { 
-    opacity: 1, 
-    y: 0,
-    transition: {
-      duration: 0.24,
-      ease: [0.4, 0, 0.2, 1]
-    }
-  }
-};
+interface StatItemProps {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}
 
-export const ProfilePage = () => {
-  const { user } = useAuth();
+const StatItem: React.FC<StatItemProps> = ({ icon, label, value }) => (
+  <div className="flex items-center gap-4">
+    <div className="w-12 h-12 rounded-lg bg-indigo-neon-600/20 flex items-center justify-center">
+      {icon}
+    </div>
+    <div>
+      <p className="text-gray-500 text-sm">{label}</p>
+      <p className="text-white font-bold text-lg">{value}</p>
+    </div>
+  </div>
+);
+
+export const ProfilePage: React.FC = () => {
+  const { user, logout } = useAuth();
   const { profile, loading, error, saveProfile } = useProfile();
   const { showSuccess, showError } = useToast();
 
-  const [major, setMajor] = useState("");
-  const [year, setYear] = useState("");
-  const [targetGpa, setTargetGpa] = useState<string>("");
+  const [formData, setFormData] = useState({
+    major: '',
+    year: '',
+    targetGpa: '',
+  });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (profile) {
-      setMajor(profile.major ?? "");
-      setYear(profile.year ?? "");
-      setTargetGpa(
-        profile.target_gpa != null ? profile.target_gpa.toString() : ""
-      );
+      setFormData({
+        major: profile.major || '',
+        year: profile.year || '',
+        targetGpa: profile.target_gpa ? profile.target_gpa.toString() : '',
+      });
     }
   }, [profile]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
 
-    const parsedTarget =
-      targetGpa.trim() === "" ? null : Number.parseFloat(targetGpa);
-
     try {
       await saveProfile({
-        major,
-        year,
-        target_gpa: Number.isNaN(parsedTarget) ? null : parsedTarget
+        major: formData.major,
+        year: formData.year,
+        target_gpa: formData.targetGpa ? parseFloat(formData.targetGpa) : null,
       });
-      showSuccess("Profile updated successfully", "Your dashboard will reflect these changes.");
+      showSuccess('Profile updated successfully!');
     } catch (err: any) {
-      showError(
-        "Failed to save changes",
-        err?.response?.data?.detail || "We couldn't save your changes. Please try again."
-      );
+      showError(err?.response?.data?.detail || 'Failed to update profile');
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading && !profile) {
+  if (loading) {
     return (
-      <PageShell>
-        <PageSection>
-          <header>
-            <Heading level="h1">Profile</Heading>
-            <Text variant="body" color="muted" className="mt-2">
-              Basic information that powers your academic insights.
-            </Text>
-          </header>
-          <SkeletonCard />
-        </PageSection>
-      </PageShell>
+      <AppLayout>
+        <div className="p-6 lg:p-12">
+          <div className="animate-pulse space-y-8">
+            <div className="h-32 bg-glass rounded-2xl" />
+            <div className="h-96 bg-glass rounded-2xl" />
+          </div>
+        </div>
+      </AppLayout>
     );
   }
 
   if (error && !profile) {
     return (
-      <PageShell>
-        <PageSection>
-          <Heading level="h1">Profile</Heading>
-          <Card variant="elevated" role="alert" aria-live="assertive">
-            <div className="flex items-center gap-3 text-danger-400">
-              <AlertCircle className="h-5 w-5" aria-hidden="true" />
-              <p className="text-sm">{error}</p>
+      <AppLayout>
+        <div className="p-6 lg:p-12">
+          <Card variant="glass" className="border-danger/30 bg-danger/5">
+            <div className="flex gap-4">
+              <AlertCircle className="text-danger flex-shrink-0" size={24} />
+              <div>
+                <h3 className="text-white font-bold mb-1">Failed to load profile</h3>
+                <p className="text-gray-400 text-sm">Please try refreshing the page</p>
+              </div>
             </div>
           </Card>
-        </PageSection>
-      </PageShell>
+        </div>
+      </AppLayout>
     );
   }
 
-  const userInitials = user?.first_name?.[0]?.toUpperCase() ||
-    user?.email?.[0]?.toUpperCase() ||
-    "U";
+  const currentGpa = profile?.current_gpa || 0;
+  const targetGpa = parseFloat(formData.targetGpa) || 0;
 
   return (
-    <PageShell>
-      <motion.div
-        initial="initial"
-        animate="animate"
-        variants={fadeInUp}
-      >
-        <PageSection>
-          <header>
-            <Heading level="h1">Profile</Heading>
-            <Text variant="body" color="muted" className="mt-2">
-              Manage your academic information and preferences.
-            </Text>
-          </header>
+    <AppLayout>
+      <div className="p-6 lg:p-12">
+        {/* Header */}
+        <div className="mb-12">
+          <h1 className="text-4xl font-bold text-white mb-2">Profile</h1>
+          <p className="text-gray-400">Manage your academic profile and settings</p>
+        </div>
 
-          {/* Profile Header Card - 8pt spacing (gap-4) */}
-          <Card variant="elevated">
-            <div className="flex items-center gap-4">
-              <Avatar text={userInitials} size="xl" />
-              <div className="flex-1">
-                <h2 className="text-lg font-semibold text-slate-100">
-                  {user?.first_name || user?.last_name
-                    ? `${user?.first_name ?? ""} ${user?.last_name ?? ""}`.trim()
-                    : "Student"}
-                </h2>
-                <p className="text-sm text-slate-400">{user?.email}</p>
-              </div>
+        {/* User Info Card */}
+        <Card variant="elevated" className="mb-12">
+          <div className="flex items-start justify-between mb-6">
+            <div>
+              <h2 className="text-3xl font-bold text-white mb-1">
+                {user?.first_name} {user?.last_name}
+              </h2>
+              <p className="text-gray-400">{user?.email}</p>
             </div>
-          </Card>
-
-          {/* Stats Grid */}
-          <div className="grid gap-4 grid-cols-1 sm:gap-5 sm:grid-cols-3">
-            <StatCard
-              label="Current GPA"
-              value={
-                profile?.current_gpa != null
-                  ? profile.current_gpa.toFixed(2)
-                  : "—"
-              }
-              icon={<TrendingUp className="h-4 w-4" />}
-            />
-            <StatCard
-              label="Major"
-              value={major || "Not set"}
-              icon={<GraduationCap className="h-4 w-4" />}
-            />
-            <StatCard
-              label="Year"
-              value={year || "Not set"}
-              icon={<BookOpen className="h-4 w-4" />}
-            />
+            <Badge variant="info">Active</Badge>
           </div>
 
-          {/* Edit Form */}
-          <Card variant="elevated">
-            <SectionHeader
-              title="Academic Information"
-              subtitle="Update your details to get personalized insights"
-              small
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-void-700">
+            <StatItem
+              icon={<TrendingUp size={20} className="text-indigo-neon-600" />}
+              label="Current GPA"
+              value={currentGpa.toFixed(2)}
+            />
+            <StatItem
+              icon={<GraduationCap size={20} className="text-indigo-neon-600" />}
+              label="Academic Year"
+              value={formData.year || 'Not set'}
+            />
+            <StatItem
+              icon={<BookOpen size={20} className="text-indigo-neon-600" />}
+              label="Major"
+              value={formData.major || 'Not set'}
+            />
+          </div>
+        </Card>
+
+        {/* Edit Profile Form */}
+        <Card variant="glass">
+          <h3 className="text-2xl font-bold text-white mb-6">Edit Profile</h3>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Input
+                label="First Name"
+                type="text"
+                value={user?.first_name || ''}
+                disabled
+                variant="underline"
+              />
+              <Input
+                label="Last Name"
+                type="text"
+                value={user?.last_name || ''}
+                disabled
+                variant="underline"
+              />
+            </div>
+
+            <Input
+              label="Email"
+              type="email"
+              value={user?.email || ''}
+              disabled
+              variant="underline"
             />
 
-            <form onSubmit={handleSubmit} className="mt-6 space-y-6">
-              <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
             <Input
               label="Major"
-              value={major}
-              onChange={(e) => setMajor(e.target.value)}
-              placeholder="e.g. Computer Science"
+              type="text"
+              name="major"
+              placeholder="e.g., Computer Science"
+              variant="underline"
+              value={formData.major}
+              onChange={handleChange}
             />
+
             <Input
-              label="Year"
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
-              placeholder="e.g. 2nd year"
+              label="Academic Year"
+              type="text"
+              name="year"
+              placeholder="e.g., Junior"
+              variant="underline"
+              value={formData.year}
+              onChange={handleChange}
             />
+
             <Input
               label="Target GPA"
-              value={targetGpa}
-              onChange={(e) => setTargetGpa(e.target.value)}
-              placeholder="e.g. 3.8"
               type="number"
-              step="0.01"
+              name="targetGpa"
+              placeholder="e.g., 3.8"
+              variant="underline"
               min="0"
               max="4"
+              step="0.01"
+              value={formData.targetGpa}
+              onChange={handleChange}
             />
-              </div>
 
-              {profile?.study_style && (
-                <div className="rounded-xl border border-slate-800/60 bg-surface-base shadow-elevation-low backdrop-blur-sm p-4">
-                  <p className="text-xs font-semibold uppercase leading-tight tracking-wide text-slate-400 mb-2">
-                    Study Style
-                  </p>
-                  <p className="text-sm leading-relaxed text-slate-200">{profile.study_style}</p>
-                </div>
-              )}
-
-              <div className="flex items-center justify-end gap-4 pt-4 border-t border-slate-800/60">
-                <Button type="submit" loading={saving} size="md">
-                  Save Changes
-                </Button>
-              </div>
-            </form>
-          </Card>
-        </PageSection>
-      </motion.div>
-    </PageShell>
+            <div className="flex gap-4 pt-4">
+              <Button
+                variant="primary"
+                size="lg"
+                loading={saving}
+                disabled={saving}
+              >
+                {saving ? 'Saving...' : 'Save Changes'}
+              </Button>
+              <Button
+                variant="ghost"
+                size="lg"
+                onClick={() => logout()}
+              >
+                Logout
+              </Button>
+            </div>
+          </form>
+        </Card>
+      </div>
+    </AppLayout>
   );
 };
-
-

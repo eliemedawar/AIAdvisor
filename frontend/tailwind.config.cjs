@@ -15,6 +15,7 @@ module.exports = {
           "sans-serif"
         ],
         display: [
+          "Syne",
           "Sora",
           "Inter",
           "-apple-system",
@@ -37,6 +38,26 @@ module.exports = {
         ]
       },
       colors: {
+        // Neural Canvas - Deep Space Dark Theme
+        void: {
+          950: "#080B14",
+          900: "#0D1117",
+          850: "#131820",
+          800: "#1A1F2E",
+          700: "#22283A",
+        },
+        "indigo-neon": {
+          600: "#6C63FF",
+          500: "#7B72FF",
+          400: "#8A81FF",
+          300: "#9B92FF",
+        },
+        "teal-neon": {
+          600: "#00D2C8",
+          500: "#1ADDD4",
+          400: "#33E8E0",
+          300: "#4DF3EC",
+        },
         // Primary: Deep Sapphire Blue (trustworthy, professional)
         primary: {
           50: '#eff6ff',
@@ -81,22 +102,27 @@ module.exports = {
         },
         // Semantic colors
         success: {
+          DEFAULT: '#14b8a6',
           500: '#14b8a6',
           600: '#0d9488'
         },
         warning: {
+          DEFAULT: '#f59e0b',
           500: '#f59e0b',
           600: '#d97706'
         },
         danger: {
+          DEFAULT: '#ef4444',
           500: '#ef4444',
           600: '#dc2626'
         },
         error: {
+          DEFAULT: '#ef4444',
           500: '#ef4444',
           600: '#dc2626'
         },
         info: {
+          DEFAULT: '#0d5eff',
           500: '#0d5eff',
           600: '#0b4fd9'
         },
@@ -126,6 +152,10 @@ module.exports = {
           light: 'rgba(71, 85, 105, 0.4)',
           strong: 'rgba(100, 116, 139, 0.8)',
         }
+      },
+      backgroundColor: {
+        glass: "rgba(13, 17, 23, 0.4)",
+        "glass-strong": "rgba(13, 17, 23, 0.6)",
       },
       fontSize: {
         // Responsive type scale with line-height and letter-spacing
@@ -176,6 +206,10 @@ module.exports = {
         'elevation-mid': '0 2px 4px -1px rgba(0, 0, 0, 0.4), 0 4px 6px -1px rgba(0, 0, 0, 0.3)',
         'elevation-high': '0 4px 8px -2px rgba(0, 0, 0, 0.45), 0 8px 16px -4px rgba(0, 0, 0, 0.35)',
         'elevation-overlay': '0 8px 16px -4px rgba(0, 0, 0, 0.5), 0 20px 40px -8px rgba(0, 0, 0, 0.4)',
+        'glow-indigo': '0 0 20px rgba(108, 99, 255, 0.3)',
+        'glow-teal': '0 0 20px rgba(0, 210, 200, 0.3)',
+        'glow-indigo-lg': '0 0 40px rgba(108, 99, 255, 0.4)',
+        'glow-teal-lg': '0 0 40px rgba(0, 210, 200, 0.4)',
       },
       borderRadius: {
         'xs': '0.25rem',   // 4px
@@ -213,6 +247,22 @@ module.exports = {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' }
         },
+        'slide-up': {
+          'from': { transform: 'translateY(10px)', opacity: '0' },
+          'to': { transform: 'translateY(0)', opacity: '1' }
+        },
+        'pulse-glow': {
+          '0%, 100%': { opacity: '1', boxShadow: '0 0 20px rgba(108, 99, 255, 0.3)' },
+          '50%': { opacity: '0.8', boxShadow: '0 0 40px rgba(108, 99, 255, 0.5)' },
+        },
+        'float': {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(-10px)' },
+        },
+        'glow-pulse': {
+          '0%, 100%': { opacity: '0.5' },
+          '50%': { opacity: '1' },
+        },
         'fade-in-up': {
           '0%': { opacity: '0', transform: 'translateY(10px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' }
@@ -244,6 +294,10 @@ module.exports = {
       },
       animation: {
         'fade-in': 'fade-in 0.3s ease-out',
+        'slide-up': 'slide-up 0.3s ease-out',
+        'pulse-glow': 'pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'float': 'float 3s ease-in-out infinite',
+        'glow-pulse': 'glow-pulse 2s ease-in-out infinite',
         'fade-in-up': 'fade-in-up 0.4s ease-out',
         'fade-in-down': 'fade-in-down 0.4s ease-out',
         'slide-in-left': 'slide-in-left 0.3s ease-out',
@@ -253,7 +307,13 @@ module.exports = {
         shimmer: 'shimmer 2s linear infinite'
       },
       backdropBlur: {
-        xs: '2px'
+        xs: '2px',
+        glass: '20px',
+        'glass-sm': '10px',
+      },
+      backgroundImage: {
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+        'gradient-mesh': 'linear-gradient(135deg, rgba(108, 99, 255, 0.1) 0%, rgba(0, 210, 200, 0.1) 100%)',
       },
       // Motion system tokens
       transitionDuration: {

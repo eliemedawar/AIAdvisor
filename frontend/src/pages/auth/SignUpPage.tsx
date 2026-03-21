@@ -1,186 +1,160 @@
-import { FormEvent, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Input, Button } from "../../components";
-import { useAuth } from "../../hooks/useAuth";
+import { useState, FormEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Mail, Lock, User, ArrowRight, Sparkles } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
 
-export const SignUpPage = () => {
-  const { register: registerUser } = useAuth();
+export function SignUpPage() {
+  const { register } = useAuth();
   const navigate = useNavigate();
-
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [form, setForm] = useState({ email: '', password: '', confirm: '', first_name: '', last_name: '' });
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  
-  const [errors, setErrors] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    password: ""
-  });
-  const [touched, setTouched] = useState({
-    firstName: false,
-    lastName: false,
-    email: false,
-    password: false
-  });
 
-  const validateEmail = (value: string): string => {
-    if (!value) return "Email is required";
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(value)) return "Please enter a valid email address";
-    return "";
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const fieldStyle = {
+    borderBottom: '1px solid rgba(255,255,255,0.15)',
   };
-
-  const validatePassword = (value: string): string => {
-    if (!value) return "Password is required";
-    if (value.length < 8) return "Password must be at least 8 characters";
-    if (!/[A-Z]/.test(value)) return "Password must contain at least one uppercase letter";
-    if (!/[a-z]/.test(value)) return "Password must contain at least one lowercase letter";
-    if (!/[0-9]/.test(value)) return "Password must contain at least one number";
-    return "";
-  };
-
-  const validateName = (value: string, field: string): string => {
-    if (!value.trim()) return `${field} is required`;
-    if (value.length < 2) return `${field} must be at least 2 characters`;
-    return "";
-  };
-
-  const handleFieldChange = (field: keyof typeof errors, value: string) => {
-    if (field === "firstName") setFirstName(value);
-    if (field === "lastName") setLastName(value);
-    if (field === "email") setEmail(value);
-    if (field === "password") setPassword(value);
-
-    if (touched[field]) {
-      let error = "";
-      if (field === "email") error = validateEmail(value);
-      else if (field === "password") error = validatePassword(value);
-      else if (field === "firstName") error = validateName(value, "First name");
-      else if (field === "lastName") error = validateName(value, "Last name");
-      
-      setErrors(prev => ({ ...prev, [field]: error }));
-    }
-  };
-
-  const handleFieldBlur = (field: keyof typeof touched) => {
-    setTouched(prev => ({ ...prev, [field]: true }));
-    
-    let error = "";
-    const value = field === "firstName" ? firstName : 
-                  field === "lastName" ? lastName :
-                  field === "email" ? email : password;
-    
-    if (field === "email") error = validateEmail(value);
-    else if (field === "password") error = validatePassword(value);
-    else if (field === "firstName") error = validateName(value, "First name");
-    else if (field === "lastName") error = validateName(value, "Last name");
-    
-    setErrors(prev => ({ ...prev, [field]: error }));
-  };
+  const onFocus = (e: React.FocusEvent<HTMLInputElement>) => (e.target.style.borderBottomColor = '#6C63FF');
+  const onBlur  = (e: React.FocusEvent<HTMLInputElement>) => (e.target.style.borderBottomColor = 'rgba(255,255,255,0.15)');
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    
-    // Validate all fields
-    const newErrors = {
-      firstName: validateName(firstName, "First name"),
-      lastName: validateName(lastName, "Last name"),
-      email: validateEmail(email),
-      password: validatePassword(password)
-    };
-    
-    setErrors(newErrors);
-    setTouched({ firstName: true, lastName: true, email: true, password: true });
-    
-    if (Object.values(newErrors).some(err => err !== "")) {
-      return;
-    }
-
-    setError(null);
+    setError('');
+    if (form.password !== form.confirm) { setError('Passwords do not match.'); return; }
     setLoading(true);
     try {
-      await registerUser({ email, password, first_name: firstName, last_name: lastName });
-      navigate("/dashboard", { replace: true });
-    } catch (err: any) {
-      setError(
-        err?.response?.data?.detail ||
-          "Unable to sign up. Please check your details and try again."
-      );
+      await register({ email: form.email, password: form.password, first_name: form.first_name, last_name: form.last_name });
+      navigate('/dashboard');
+    } catch {
+      setError('Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Input
-          label="First name"
-          name="firstName"
-          required
-          value={firstName}
-          onChange={(e) => handleFieldChange("firstName", e.target.value)}
-          onBlur={() => handleFieldBlur("firstName")}
-          error={touched.firstName ? errors.firstName : ""}
-        />
-        <Input
-          label="Last name"
-          name="lastName"
-          required
-          value={lastName}
-          onChange={(e) => handleFieldChange("lastName", e.target.value)}
-          onBlur={() => handleFieldBlur("lastName")}
-          error={touched.lastName ? errors.lastName : ""}
-        />
+    <div className="min-h-screen flex" style={{ background: '#080B14' }}>
+
+      {/* ── Left hero panel ── */}
+      <div className="hidden lg:flex lg:w-1/2 relative flex-col items-start justify-center p-16 overflow-hidden">
+        <div className="absolute top-1/4 left-1/3 w-80 h-80 rounded-full blur-3xl" style={{ background: 'rgba(108,99,255,0.12)' }} />
+        <div className="absolute bottom-1/4 right-1/4 w-56 h-56 rounded-full blur-3xl" style={{ background: 'rgba(0,210,200,0.08)' }} />
+
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}
+          className="relative z-10 max-w-md">
+          <div className="flex items-center gap-3 mb-12">
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#6C63FF,#00D2C8)', boxShadow: '0 0 20px rgba(108,99,255,0.35)' }}>
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <span className="font-bold text-xl text-white" style={{ fontFamily: 'Syne, sans-serif' }}>AI Advisor</span>
+          </div>
+          <h1 className="font-bold leading-tight text-white mb-5" style={{ fontFamily: 'Syne, sans-serif', fontSize: '3rem' }}>
+            Start your academic
+            <span className="block" style={{ background: 'linear-gradient(135deg,#6C63FF,#00D2C8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>journey.</span>
+          </h1>
+          <p className="text-base leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>
+            Create an account to unlock personalised study insights and achieve your academic goals.
+          </p>
+        </motion.div>
       </div>
-      <div className="space-y-4">
-        <Input
-          label="University email"
-          type="email"
-          name="email"
-          autoComplete="email"
-          required
-          value={email}
-          onChange={(e) => handleFieldChange("email", e.target.value)}
-          onBlur={() => handleFieldBlur("email")}
-          error={touched.email ? errors.email : ""}
-        />
-        <Input
-          label="Password"
-          type="password"
-          name="password"
-          autoComplete="new-password"
-          required
-          value={password}
-          onChange={(e) => handleFieldChange("password", e.target.value)}
-          onBlur={() => handleFieldBlur("password")}
-          error={touched.password ? errors.password : ""}
-          helperText="Must be at least 8 characters with uppercase, lowercase, and number"
-        />
+
+      {/* ── Right form panel ── */}
+      <div className="flex-1 flex items-center justify-center p-6 lg:p-16">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}
+          className="w-full max-w-sm">
+
+          {/* Mobile logo */}
+          <div className="lg:hidden flex items-center gap-2 mb-10">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#6C63FF,#00D2C8)' }}>
+              <Sparkles className="w-4 h-4 text-white" />
+            </div>
+            <span className="font-bold text-white" style={{ fontFamily: 'Syne, sans-serif' }}>AI Advisor</span>
+          </div>
+
+          <div className="mb-10">
+            <h2 className="font-bold text-white mb-2" style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.75rem' }}>Create account</h2>
+            <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>Start your AI-powered academic journey</p>
+          </div>
+
+          <form onSubmit={handleSubmit}>
+            <div className="flex flex-col gap-7 mb-8">
+              {/* Name row */}
+              <div className="grid grid-cols-2 gap-5">
+                {[['first_name','First name','John'],['last_name','Last name','Doe']].map(([k,lbl,ph]) => (
+                  <div key={k}>
+                    <label className="block text-xs font-medium mb-3 uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.4)' }}>{lbl}</label>
+                    <div className="relative">
+                      <User className="absolute left-0 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: 'rgba(255,255,255,0.25)' }} />
+                      <input type="text" value={(form as any)[k]} onChange={set(k)} placeholder={ph}
+                        className="w-full bg-transparent pl-6 pb-2 text-sm text-white outline-none placeholder:text-white/25"
+                        style={fieldStyle} onFocus={onFocus} onBlur={onBlur} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="block text-xs font-medium mb-3 uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.4)' }}>Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(255,255,255,0.25)' }} />
+                  <input type="email" value={form.email} onChange={set('email')} placeholder="you@university.edu" required
+                    className="w-full bg-transparent pl-7 pb-2 text-sm text-white outline-none placeholder:text-white/25"
+                    style={fieldStyle} onFocus={onFocus} onBlur={onBlur} />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label className="block text-xs font-medium mb-3 uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.4)' }}>Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(255,255,255,0.25)' }} />
+                  <input type="password" value={form.password} onChange={set('password')} placeholder="••••••••" required
+                    className="w-full bg-transparent pl-7 pb-2 text-sm text-white outline-none placeholder:text-white/25"
+                    style={fieldStyle} onFocus={onFocus} onBlur={onBlur} />
+                </div>
+              </div>
+
+              {/* Confirm */}
+              <div>
+                <label className="block text-xs font-medium mb-3 uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.4)' }}>Confirm password</label>
+                <div className="relative">
+                  <Lock className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(255,255,255,0.25)' }} />
+                  <input type="password" value={form.confirm} onChange={set('confirm')} placeholder="••••••••" required
+                    className="w-full bg-transparent pl-7 pb-2 text-sm text-white outline-none placeholder:text-white/25"
+                    style={fieldStyle} onFocus={onFocus} onBlur={onBlur} />
+                </div>
+              </div>
+            </div>
+
+            {error && (
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                className="text-xs mb-6 p-3 rounded-xl" style={{ color: '#fb7185', background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.2)' }}>
+                {error}
+              </motion.p>
+            )}
+
+            <motion.button type="submit" disabled={loading}
+              whileHover={{ scale: loading ? 1 : 1.02, boxShadow: loading ? undefined : '0 0 30px rgba(108,99,255,0.5)' }}
+              whileTap={{ scale: loading ? 1 : 0.98 }}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-full text-sm font-semibold text-white"
+              style={{ background: 'linear-gradient(135deg,#6C63FF,#5b52e0)', boxShadow: '0 0 20px rgba(108,99,255,0.3)', opacity: loading ? 0.6 : 1, cursor: loading ? 'not-allowed' : 'pointer' }}>
+              {loading
+                ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : <><span>Create account</span><ArrowRight className="w-4 h-4" /></>}
+            </motion.button>
+          </form>
+
+          <p className="mt-8 text-center text-sm" style={{ color: 'rgba(255,255,255,0.35)' }}>
+            Already have an account?{' '}
+            <Link to="/auth/sign-in" className="font-medium" style={{ color: '#6C63FF' }}>Sign in</Link>
+          </p>
+        </motion.div>
       </div>
-      {error && (
-        <div className="rounded-xl border border-danger-500/60 bg-danger-500/10 px-4 py-3 text-sm text-danger-200">
-          {error}
-        </div>
-      )}
-      <Button type="submit" className="w-full" loading={loading}>
-        Sign up
-      </Button>
-      <p className="text-center text-xs text-slate-400">
-        Already have an account?{" "}
-        <Link
-          to="/auth/sign-in"
-          className="font-medium text-primary-300 hover:text-primary-200"
-        >
-          Sign in
-        </Link>
-      </p>
-    </form>
+    </div>
   );
-};
+}
 
-
+export const SignUpPage$ = SignUpPage;

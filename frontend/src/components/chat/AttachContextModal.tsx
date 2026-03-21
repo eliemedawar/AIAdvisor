@@ -310,10 +310,10 @@ export const AttachContextModal = ({ isOpen, onClose, onAttach }: AttachContextM
         <div className="flex gap-2 border-b border-slate-800/60">
           <button
             onClick={() => setActiveTab("courses")}
-            className={`flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-smooth ${
+            className={`flex items-center gap-2 rounded-t-lg px-4 py-2 text-sm font-medium transition-smooth ${
               activeTab === "courses"
-                ? "border-primary-500 text-primary-400"
-                : "border-transparent text-slate-400 hover:text-slate-200"
+                ? "text-slate-50 bg-gradient-to-b from-slate-800/90 to-slate-900/80 border border-slate-700/70 border-b-transparent shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
+                : "text-slate-400 bg-slate-950/30 hover:bg-slate-900/50 hover:text-slate-200 border border-transparent"
             }`}
           >
             <BookOpen className="h-4 w-4" />
@@ -326,10 +326,10 @@ export const AttachContextModal = ({ isOpen, onClose, onAttach }: AttachContextM
           </button>
           <button
             onClick={() => setActiveTab("assignments")}
-            className={`flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-smooth ${
+            className={`flex items-center gap-2 rounded-t-lg px-4 py-2 text-sm font-medium transition-smooth ${
               activeTab === "assignments"
-                ? "border-primary-500 text-primary-400"
-                : "border-transparent text-slate-400 hover:text-slate-200"
+                ? "text-slate-50 bg-gradient-to-b from-slate-800/90 to-slate-900/80 border border-slate-700/70 border-b-transparent shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
+                : "text-slate-400 bg-slate-950/30 hover:bg-slate-900/50 hover:text-slate-200 border border-transparent"
             }`}
           >
             <FileText className="h-4 w-4" />
@@ -342,10 +342,10 @@ export const AttachContextModal = ({ isOpen, onClose, onAttach }: AttachContextM
           </button>
           <button
             onClick={() => setActiveTab("tasks")}
-            className={`flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-smooth ${
+            className={`flex items-center gap-2 rounded-t-lg px-4 py-2 text-sm font-medium transition-smooth ${
               activeTab === "tasks"
-                ? "border-primary-500 text-primary-400"
-                : "border-transparent text-slate-400 hover:text-slate-200"
+                ? "text-slate-50 bg-gradient-to-b from-slate-800/90 to-slate-900/80 border border-slate-700/70 border-b-transparent shadow-[0_8px_24px_rgba(0,0,0,0.35)]"
+                : "text-slate-400 bg-slate-950/30 hover:bg-slate-900/50 hover:text-slate-200 border border-transparent"
             }`}
           >
             <CheckSquare className="h-4 w-4" />

@@ -1,386 +1,209 @@
-import { motion } from "framer-motion";
-import {
-  TrendingUp,
-  TrendingDown,
-  Calendar,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  BookOpen,
-} from "lucide-react";
-import {
-  PageShell,
-  PageSection,
-  Heading,
-  Text,
-  Card,
-  SectionHeader,
-  StatCard,
-  Badge,
-  EmptyState,
-  SkeletonCard,
-  SkeletonList,
-  Button,
-} from "../../components";
-import { SkeletonStatCard } from "../../components/core/Skeleton";
-import { useDashboard } from "../../hooks/useDashboard";
-import { GpaTrendChart, WeeklyTasksChart, StudyTimeByCourseChart } from "../../components/dashboard";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { TrendingUp, TrendingDown, Calendar, CheckCircle2, Clock, AlertCircle, BookOpen, ArrowRight } from 'lucide-react';
+import { useDashboard } from '../../hooks/useDashboard';
+import { useAuth } from '../../hooks/useAuth';
+import { AreaChart, Area, ResponsiveContainer, XAxis, Tooltip, BarChart, Bar } from 'recharts';
+import { Badge } from '../../components/ui/Badge';
 
-const staggerChildren = {
-  animate: {
-    transition: {
-      staggerChildren: 0.05,
-      delayChildren: 0.02
-    }
-  }
-};
+const stagger = { animate: { transition: { staggerChildren: 0.07 } } };
+const fadeUp = { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
 
-const fadeInUp = {
-  initial: { opacity: 0, y: 20 },
-  animate: { 
-    opacity: 1, 
-    y: 0,
-    transition: {
-      duration: 0.24,
-      ease: [0.4, 0, 0.2, 1]
-    }
-  }
-};
-
-const buildAnalyticsInsight = (
-  gpaTrendDirection: "up" | "down" | "neutral",
-  gpaTrendValue: string,
-  weeklyCompletionRate: number,
-  totalPlanned: number
-) => {
-  const trendCopy =
-    gpaTrendDirection === "up" && gpaTrendValue
-      ? `GPA is up ${gpaTrendValue}`
-      : gpaTrendDirection === "down" && gpaTrendValue
-      ? `GPA dipped ${gpaTrendValue}`
-      : "GPA is holding steady";
-
-  const weeklyCopy =
-    totalPlanned > 0
-      ? `you’re completing ${Math.round(weeklyCompletionRate)}% of planned work`
-      : "log a few tasks to get completion analytics";
-
-  return `${trendCopy}, and ${weeklyCopy}.`;
-};
-
-export const DashboardPage = () => {
+export function DashboardPage() {
   const navigate = useNavigate();
-  const { overview, loading, error, refresh } = useDashboard();
+  const { user } = useAuth();
+  const { overview, loading } = useDashboard();
 
-  if (loading) {
-    return (
-      <PageShell>
-        <PageSection>
-          <header>
-            <Heading level="h1">Dashboard</Heading>
-            <Text variant="body" color="muted" className="mt-2">
-              Overview of your GPA, upcoming deadlines, and focus for the week.
-            </Text>
-          </header>
-          <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            <SkeletonStatCard />
-            <SkeletonStatCard />
-            <SkeletonStatCard />
-          </div>
-          <SkeletonList count={3} />
-        </PageSection>
-      </PageShell>
-    );
-  }
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const firstName = user?.first_name || 'there';
 
-  if (error && !overview) {
-    return (
-      <PageShell>
-        <PageSection>
-          <header>
-            <Heading level="h1">Dashboard</Heading>
-            <Text variant="body" color="muted" className="mt-2">
-              Overview of your GPA, upcoming deadlines, and focus for the week.
-            </Text>
-          </header>
-          <Card variant="default" padding="md" className="border-error-500/30 bg-error-500/5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-error-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-error-200">Failed to load dashboard</p>
-                  <p className="mt-1 text-xs text-slate-400">{error}</p>
-                </div>
-              </div>
-              <Button size="sm" variant="primary" onClick={() => refresh()}>
-                Try again
-              </Button>
-            </div>
-          </Card>
-        </PageSection>
-      </PageShell>
-    );
-  }
-
-  // Calculate metrics for stat cards
-  const currentGpa = overview?.current_gpa;
   const gpaTrend = overview?.gpa_trend || [];
-  const hasGpaTrend = gpaTrend.length >= 2;
-  
-  // Calculate GPA trend for stat card
-  let gpaTrendDirection: "up" | "down" | "neutral" = "neutral";
-  let gpaTrendValue = "";
-  
-  if (hasGpaTrend) {
-    const firstGpa = gpaTrend[0].gpa;
-    const lastGpa = gpaTrend[gpaTrend.length - 1].gpa;
-    const delta = lastGpa - firstGpa;
-    
-    if (delta > 0.05) {
-      gpaTrendDirection = "up";
-      gpaTrendValue = `+${delta.toFixed(2)}`;
-    } else if (delta < -0.05) {
-      gpaTrendDirection = "down";
-      gpaTrendValue = `${delta.toFixed(2)}`;
-    }
-  }
+  const currentGpa = typeof overview?.current_gpa === 'number' ? overview.current_gpa : null;
 
-  // Filter upcoming deadlines for next 2-4 weeks
-  const now = new Date();
-  const twoWeeksFromNow = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
-  const fourWeeksFromNow = new Date(now.getTime() + 28 * 24 * 60 * 60 * 1000);
-  const upcomingDeadlines = overview?.upcoming_deadlines?.filter(d => {
-    const dueDate = new Date(d.due_at);
-    return dueDate >= now && dueDate <= fourWeeksFromNow;
-  }) || [];
+  const gpaDirection = gpaTrend.length >= 2
+    ? gpaTrend[gpaTrend.length - 1].gpa > gpaTrend[0].gpa ? 'up' : 'down'
+    : 'neutral';
 
-  // Calculate weekly task completion stats
-  const weeklyTaskStats = overview?.weekly_task_stats || [];
-  const totalCompleted = weeklyTaskStats.reduce((sum, d) => sum + d.completed, 0);
-  const totalPlanned = weeklyTaskStats.reduce((sum, d) => sum + d.planned, 0);
-  const weeklyTasksDisplay = totalPlanned > 0 ? `${totalCompleted}/${totalPlanned}` : totalCompleted;
-  const weeklyCompletionRate = totalPlanned > 0 ? (totalCompleted / totalPlanned) * 100 : 0;
+  const upcomingDeadlines = overview?.upcoming_deadlines?.slice(0, 5) || [];
+  const weeklyStats = overview?.weekly_task_stats || [];
+  const studyTime = overview?.study_time_by_course || [];
 
-  // Get next 3 tasks sorted by due date
-  const allTasks = [...(overview?.weekly_tasks || []), ...(overview?.upcoming_deadlines || [])];
-  const next3Tasks = allTasks
-    .filter(task => task.due_at)
+  const next3 = [
+    ...(overview?.weekly_tasks || []),
+    ...(overview?.upcoming_deadlines || []),
+  ]
+    .filter(t => t.due_at)
     .sort((a, b) => new Date(a.due_at!).getTime() - new Date(b.due_at!).getTime())
     .slice(0, 3);
 
-  // Identify at-risk courses (low study hours)
-  const studyTimeByCourse = overview?.study_time_by_course || [];
-  const atRiskCourses = studyTimeByCourse.filter(c => c.hours < 5);
+  const totalCompleted = weeklyStats.reduce((s, d) => s + d.completed, 0);
+  const totalPlanned = weeklyStats.reduce((s, d) => s + d.planned, 0);
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-screen" style={{ background: '#080B14' }}>
+      <div className="w-10 h-10 rounded-full border-2 animate-spin" style={{ borderColor: 'rgba(108,99,255,0.3)', borderTopColor: '#6C63FF' }} />
+    </div>
+  );
 
   return (
-    <PageShell>
-      <motion.div
-        variants={staggerChildren}
-        initial="initial"
-        animate="animate"
-      >
-        <PageSection className="space-y-8 lg:space-y-10">
-          <header>
-            <Heading level="h1">Dashboard</Heading>
-            <Text variant="body" color="muted" className="mt-2">
-              Analytics-driven insights into your academic performance and priorities.
-            </Text>
-          </header>
+    <motion.div variants={stagger} initial="initial" animate="animate" className="p-6 lg:p-8 max-w-7xl mx-auto">
 
-          {/* TOP ROW - Key Stats */}
-          <motion.div
-            className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 lg:gap-6"
-            variants={fadeInUp}
-          >
-            <StatCard
-              label="Current GPA"
-              value={currentGpa != null ? currentGpa.toFixed(2) : "—"}
-              icon={gpaTrendDirection === "up" ? <TrendingUp className="h-4 w-4" /> : gpaTrendDirection === "down" ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
-              trend={gpaTrendDirection}
-              trendValue={gpaTrendValue || undefined}
-            />
-            <StatCard
-              label="Upcoming Deadlines"
-              value={upcomingDeadlines.length}
-              icon={<Calendar className="h-4 w-4" />}
-            />
-            <StatCard
-              label="Weekly Tasks"
-              value={weeklyTasksDisplay}
-              icon={<CheckCircle2 className="h-4 w-4" />}
-            />
-          </motion.div>
-
-          {/* MIDDLE - Charts and Trends */}
-          <section className="space-y-4">
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-              <SectionHeader
-                title="Performance pulse"
-                subtitle="GPA and task velocity stay aligned for healthier pacing."
-                small
-              />
-              <Text
-                variant="small"
-                className="rounded-xl border border-slate-800/60 bg-slate-950/60 px-4 py-2.5 text-slate-300 shadow-elevation-flat backdrop-blur-sm"
-              >
-                {buildAnalyticsInsight(gpaTrendDirection, gpaTrendValue, weeklyCompletionRate, totalPlanned)}
-              </Text>
-            </div>
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-              {/* Left - GPA Trend */}
-              <motion.div variants={fadeInUp} className="h-full">
-                <GpaTrendChart
-                  data={gpaTrend}
-                  currentGpa={currentGpa}
-                  className="h-full"
-                />
-              </motion.div>
-
-              {/* Right - Stacked Charts (1 column) */}
-              <motion.div variants={fadeInUp} className="space-y-5">
-                <WeeklyTasksChart data={weeklyTaskStats} className="min-h-[240px]" />
-                <StudyTimeByCourseChart data={studyTimeByCourse} className="min-h-[260px]" />
-              </motion.div>
-            </div>
-          </section>
-
-          {/* BOTTOM - Actionable Lists */}
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-6">
-            {/* Next 3 Tasks */}
-            <motion.div variants={fadeInUp} className="h-full">
-              <Card variant="elevated" className="h-full">
-                <SectionHeader
-                  title="Next 3 Tasks"
-                  subtitle="Your immediate priorities"
-                  small
-                />
-                <div className="mt-4 space-y-3">
-                  {next3Tasks.length > 0 ? (
-                    next3Tasks.map((task, index) => (
-                      <motion.div
-                        key={`task-${task.id}`}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05, duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
-                        className="group flex items-center justify-between rounded-xl border border-slate-800/60 bg-surface-base px-4 py-3 shadow-elevation-low transition-all duration-quick ease-snappy hover:bg-surface-elevated hover:border-slate-700/80 hover:shadow-elevation-mid hover:-translate-y-0.5"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-500/10 text-primary-400 transition-colors group-hover:bg-primary-500/20">
-                            <Clock className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-slate-100">
-                              {task.title}
-                            </p>
-                            <p className="text-xs text-slate-400">
-                              Due{" "}
-                              {new Date(task.due_at!).toLocaleString(undefined, {
-                                month: "short",
-                                day: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit"
-                              })}
-                            </p>
-                          </div>
-                        </div>
-                        {"priority" in task && (
-                          <Badge
-                            variant={
-                              task.priority === "high"
-                                ? "danger"
-                                : task.priority === "medium"
-                                ? "warning"
-                                : "default"
-                            }
-                            size="sm"
-                          >
-                            {task.priority}
-                          </Badge>
-                        )}
-                      </motion.div>
-                    ))
-                  ) : (
-                    <EmptyState
-                      icon={<CheckCircle2 className="h-8 w-8" />}
-                      title="No upcoming tasks"
-                      description="You're all caught up. Plan your next focus items to stay proactive."
-                      action={
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          onClick={() => navigate("/calendar")}
-                        >
-                          Plan tasks
-                        </Button>
-                      }
-                    />
-                  )}
-                </div>
-              </Card>
-            </motion.div>
-
-            {/* At-Risk Courses */}
-            <motion.div variants={fadeInUp} className="h-full">
-              <Card variant="elevated" className="h-full">
-                <SectionHeader
-                  title="At-Risk Courses"
-                  subtitle="Courses needing more attention"
-                  small
-                />
-                <div className="mt-4 space-y-3">
-                  {atRiskCourses.length > 0 ? (
-                    atRiskCourses.map((course, index) => (
-                      <motion.div
-                        key={`course-${index}`}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05, duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
-                        className="group flex items-center justify-between rounded-xl border border-warning-500/30 bg-warning-500/5 px-4 py-3 shadow-elevation-low transition-all duration-quick ease-snappy hover:bg-warning-500/10 hover:border-warning-500/50 hover:shadow-elevation-mid hover:-translate-y-0.5"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning-500/10 text-warning-400">
-                            <AlertCircle className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-slate-100">
-                              {course.courseName}
-                            </p>
-                            <p className="text-xs text-slate-400">
-                              Only {course.hours}h study time this week
-                            </p>
-                          </div>
-                        </div>
-                        <Badge variant="warning" size="sm">
-                          Plan study
-                        </Badge>
-                      </motion.div>
-                    ))
-                  ) : (
-                    <EmptyState
-                      icon={<BookOpen className="h-8 w-8" />}
-                      title="All courses on track"
-                      description="Your study time is well distributed across every course this week."
-                      action={
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => navigate("/calendar")}
-                        >
-                          Review schedule
-                        </Button>
-                      }
-                    />
-                  )}
-                </div>
-              </Card>
-            </motion.div>
+      {/* Hero */}
+      <motion.div variants={fadeUp} className="relative rounded-3xl overflow-hidden mb-8 p-8 lg:p-10"
+        style={{ background: 'linear-gradient(135deg, rgba(108,99,255,0.08) 0%, rgba(0,0,0,0) 60%, rgba(0,210,200,0.06) 100%)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <motion.div
+          className="absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl"
+          style={{ background: 'rgba(108,99,255,0.10)' }}
+          animate={{ x: [0, -10, 6, 0], y: [0, 8, -6, 0] }}
+          transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
+        />
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium mb-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+            </p>
+            <h1 className="font-bold text-3xl lg:text-4xl text-white" style={{ fontFamily: 'Syne, sans-serif' }}>
+              {greeting},{' '}
+              <span style={{ background: 'linear-gradient(135deg,#6C63FF,#00D2C8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                {firstName}
+              </span>
+            </h1>
           </div>
-
-        </PageSection>
+          {currentGpa !== null && (
+            <div className="flex items-center gap-3 px-6 py-4 rounded-2xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              {gpaDirection === 'up'
+                ? <TrendingUp className="w-5 h-5" style={{ color: '#00D2C8' }} />
+                : <TrendingDown className="w-5 h-5" style={{ color: '#fb7185' }} />}
+              <div>
+                <p className="text-xs uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.4)' }}>Current GPA</p>
+                <p className="font-bold text-2xl text-white" style={{ fontFamily: 'Syne, sans-serif' }}>{currentGpa.toFixed(2)}</p>
+              </div>
+            </div>
+          )}
+        </div>
       </motion.div>
-    </PageShell>
+
+      {/* Stat strip */}
+      <motion.div variants={fadeUp} className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {[
+          { label: 'Upcoming', value: upcomingDeadlines.length, color: '#6C63FF' },
+          { label: 'Tasks done', value: `${totalCompleted}/${totalPlanned}`, color: '#00D2C8' },
+          { label: 'Courses', value: studyTime.length, color: '#f59e0b' },
+          { label: 'At risk', value: studyTime.filter(c => c.hours < 5).length, color: studyTime.filter(c => c.hours < 5).length > 0 ? '#fb7185' : '#00D2C8' },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid rgba(255,255,255,0.07)`, borderLeft: `4px solid ${color}` }}>
+            <p className="font-bold text-2xl text-white mb-1" style={{ fontFamily: 'Syne, sans-serif' }}>{value}</p>
+            <p className="text-xs uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.4)' }}>{label}</p>
+          </div>
+        ))}
+      </motion.div>
+
+      {/* Charts */}
+      <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div className="lg:col-span-2 rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <h2 className="font-semibold text-white text-lg mb-1" style={{ fontFamily: 'Syne, sans-serif' }}>GPA Trend</h2>
+          <p className="text-xs mb-6" style={{ color: 'rgba(255,255,255,0.4)' }}>Across all semesters</p>
+          <ResponsiveContainer width="100%" height={160}>
+            <AreaChart data={gpaTrend}>
+              <defs>
+                <linearGradient id="gpaGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#6C63FF" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#6C63FF" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="term" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={{ background: '#0D1117', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, color: '#fff', fontSize: 12 }} />
+              <Area type="monotone" dataKey="gpa" stroke="#6C63FF" strokeWidth={2} fill="url(#gpaGrad)" dot={{ fill: '#6C63FF', strokeWidth: 0, r: 4 }} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <h2 className="font-semibold text-white text-lg mb-1" style={{ fontFamily: 'Syne, sans-serif' }}>Weekly Tasks</h2>
+          <p className="text-xs mb-6" style={{ color: 'rgba(255,255,255,0.4)' }}>Completed vs planned</p>
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={weeklyStats} barSize={6} barGap={2}>
+              <XAxis dataKey="week" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={{ background: '#0D1117', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, color: '#fff', fontSize: 12 }} />
+              <Bar dataKey="planned" fill="rgba(108,99,255,0.2)" radius={[4,4,0,0]} />
+              <Bar dataKey="completed" fill="#6C63FF" radius={[4,4,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </motion.div>
+
+      {/* Bottom row */}
+      <motion.div variants={fadeUp} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Next tasks */}
+        <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="font-semibold text-white text-lg" style={{ fontFamily: 'Syne, sans-serif' }}>Next up</h2>
+              <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Your immediate priorities</p>
+            </div>
+            <button onClick={() => navigate('/planner')} className="text-xs flex items-center gap-1 transition-colors" style={{ color: '#6C63FF' }}>
+              View all <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
+          <div className="space-y-3">
+            {next3.length > 0 ? next3.map((task, i) => (
+              <motion.div key={task.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
+                className="flex items-center gap-4 p-3 rounded-xl transition-colors"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(108,99,255,0.15)' }}>
+                  <Clock className="w-4 h-4" style={{ color: '#6C63FF' }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white truncate">{task.title}</p>
+                  <p className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                    Due {new Date(task.due_at!).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </p>
+                </div>
+                {'priority' in task && (
+                  <Badge variant={task.priority === 'high' ? 'rose' : task.priority === 'medium' ? 'amber' : 'default'}>
+                    {task.priority}
+                  </Badge>
+                )}
+              </motion.div>
+            )) : (
+              <div className="text-center py-8">
+                <CheckCircle2 className="w-8 h-8 mx-auto mb-3" style={{ color: '#00D2C8' }} />
+                <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>All caught up!</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Study time */}
+        <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <h2 className="font-semibold text-white text-lg mb-1" style={{ fontFamily: 'Syne, sans-serif' }}>Study time</h2>
+          <p className="text-xs mb-6" style={{ color: 'rgba(255,255,255,0.4)' }}>Hours per course this week</p>
+          <div className="space-y-4">
+            {studyTime.map((c) => {
+              const max = Math.max(...studyTime.map(x => x.hours), 1);
+              const pct = (c.hours / max) * 100;
+              const isRisk = c.hours < 5;
+              return (
+                <div key={c.courseName}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-sm font-medium text-white">{c.courseName}</span>
+                    <span className="text-xs font-semibold" style={{ color: isRisk ? '#f59e0b' : '#00D2C8' }}>{c.hours}h</span>
+                  </div>
+                  <div className="h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${pct}%` }}
+                      transition={{ duration: 0.8, delay: 0.2 }}
+                      className="h-full rounded-full"
+                      style={{ background: isRisk ? '#f59e0b' : 'linear-gradient(90deg, #6C63FF, #00D2C8)' }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
   );
-};
-
-
+}
