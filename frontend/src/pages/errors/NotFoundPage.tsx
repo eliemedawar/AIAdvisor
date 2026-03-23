@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Heading, Text, Overline } from "../../components";
-import { Button } from "../../components/ui/Button";
+import { Heading, Text, Overline, Button } from "../../components";
 
 export const NotFoundPage = () => {
   return (

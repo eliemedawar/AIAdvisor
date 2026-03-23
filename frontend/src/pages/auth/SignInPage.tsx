@@ -20,59 +20,20 @@ export function SignInPage() {
       await login({ email, password });
       navigate('/dashboard');
     } catch {
-      setError('Invalid credentials.');
+      setError('Invalid credentials. Use demo@university.edu with any password.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex relative overflow-hidden" style={{ background: '#070A13' }}>
-      {/* Animated background layers */}
-      <motion.div
-        aria-hidden="true"
-        className="absolute inset-0"
-        style={{
-          background: 'radial-gradient(1200px 800px at 20% 10%, rgba(108,99,255,0.20), transparent 60%), radial-gradient(900px 700px at 85% 80%, rgba(0,210,200,0.14), transparent 60%)'
-        }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1.2, ease: 'easeOut' }}
-      />
-      <motion.div
-        aria-hidden="true"
-        className="absolute -inset-24 blur-3xl"
-        style={{
-          background: 'conic-gradient(from 180deg at 50% 50%, rgba(108,99,255,0.12), rgba(0,210,200,0.10), rgba(108,99,255,0.12))'
-        }}
-        animate={{ rotate: 360 }}
-        transition={{ duration: 40, ease: 'linear', repeat: Infinity }}
-      />
-      <div
-        aria-hidden="true"
-        className="absolute inset-0"
-        style={{
-          backgroundImage: 'radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px)',
-          backgroundSize: '22px 22px',
-          opacity: 0.2
-        }}
-      />
+    <div className="min-h-screen flex" style={{ background: '#080B14' }}>
 
       {/* ── Left hero panel (desktop only) ────────────────────────── */}
       <div className="hidden lg:flex lg:w-1/2 relative flex-col items-start justify-center p-16 overflow-hidden">
         {/* Ambient blobs */}
-        <motion.div
-          className="absolute top-1/4 left-1/3 w-80 h-80 rounded-full blur-3xl"
-          style={{ background: 'rgba(108,99,255,0.16)' }}
-          animate={{ x: [0, 18, -12, 0], y: [0, -10, 12, 0] }}
-          transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        <motion.div
-          className="absolute bottom-1/4 right-1/4 w-56 h-56 rounded-full blur-3xl"
-          style={{ background: 'rgba(0,210,200,0.12)' }}
-          animate={{ x: [0, -14, 10, 0], y: [0, 12, -8, 0] }}
-          transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }}
-        />
+        <div className="absolute top-1/4 left-1/3 w-80 h-80 rounded-full blur-3xl" style={{ background: 'rgba(108,99,255,0.12)' }} />
+        <div className="absolute bottom-1/4 right-1/4 w-56 h-56 rounded-full blur-3xl" style={{ background: 'rgba(0,210,200,0.08)' }} />
 
         <motion.div
           initial={{ opacity: 0, y: 24 }}
@@ -82,14 +43,9 @@ export function SignInPage() {
         >
           {/* Logo */}
           <div className="flex items-center gap-3 mb-12">
-            <motion.div
-              className="w-10 h-10 rounded-2xl flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg,#6C63FF,#00D2C8)', boxShadow: '0 0 24px rgba(108,99,255,0.45)' }}
-              animate={{ rotate: [0, 2, -2, 0] }}
-              transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-            >
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#6C63FF,#00D2C8)', boxShadow: '0 0 20px rgba(108,99,255,0.35)' }}>
               <Sparkles className="w-5 h-5 text-white" />
-            </motion.div>
+            </div>
             <span className="font-bold text-xl text-white" style={{ fontFamily: 'Syne, sans-serif' }}>AI Advisor</span>
           </div>
 
@@ -125,31 +81,8 @@ export function SignInPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
-          className="w-full max-w-sm relative"
+          className="w-full max-w-sm"
         >
-          <motion.div
-            aria-hidden="true"
-            className="absolute -inset-6 rounded-3xl pointer-events-none"
-            style={{ background: 'linear-gradient(135deg, rgba(108,99,255,0.10), rgba(0,210,200,0.06))', border: '1px solid rgba(255,255,255,0.05)' }}
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8, ease: 'easeOut' }}
-          />
-          <div className="relative">
-          <motion.div
-            aria-hidden="true"
-            className="absolute -top-6 -right-4 w-20 h-20 rounded-full blur-2xl pointer-events-none"
-            style={{ background: 'rgba(108,99,255,0.18)' }}
-            animate={{ y: [0, 8, -6, 0] }}
-            transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          <motion.div
-            aria-hidden="true"
-            className="absolute -bottom-4 -left-6 w-24 h-24 rounded-full blur-2xl pointer-events-none"
-            style={{ background: 'rgba(0,210,200,0.12)' }}
-            animate={{ y: [0, -8, 6, 0] }}
-            transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
-          />
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2 mb-10">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg,#6C63FF,#00D2C8)' }}>
@@ -212,6 +145,11 @@ export function SignInPage() {
               </motion.p>
             )}
 
+            {/* Demo hint */}
+            <div className="mb-6 p-3 rounded-xl text-xs" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)' }}>
+              <span style={{ color: '#00D2C8', fontWeight: 600 }}>Demo: </span>demo@university.edu / any password
+            </div>
+
             {/* Submit */}
             <motion.button
               type="submit"
@@ -235,7 +173,6 @@ export function SignInPage() {
               Create one
             </Link>
           </p>
-          </div>
         </motion.div>
       </div>
     </div>

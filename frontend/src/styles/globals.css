@@ -1,18 +1,20 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Syne:wght@400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Syne:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Neural Canvas - Global Design System */
+/* ─────────────────────────────────────────────────────────────────────────
+   NEURAL CANVAS - Global Design System
+   Deep space dark theme with electric indigo & neon teal
+   ───────────────────────────────────────────────────────────────────────── */
+
 @layer base {
   :root {
-    --sidebar-desktop-width: 16rem;
     --void-950: #080B14;
     --void-900: #0D1117;
     --void-850: #131820;
     --void-800: #1A1F2E;
-    --void-700: #22283A;
     --indigo-neon-600: #6C63FF;
     --indigo-neon-500: #7B72FF;
     --teal-neon-600: #00D2C8;
@@ -22,7 +24,6 @@
   html {
     @apply antialiased;
     scroll-behavior: smooth;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
   html, body, #root {
@@ -32,8 +33,6 @@
   body {
     @apply bg-void-950 text-gray-200 antialiased;
     font-family: 'Inter', system-ui, sans-serif;
-    font-size: clamp(0.95rem, 0.92rem + 0.3vw, 1rem);
-    letter-spacing: 0.01em;
     background: linear-gradient(to bottom right, #080B14, #0D1117, #080B14);
   }
 
@@ -69,28 +68,8 @@
   }
 
   /* Focus styles */
-  button:focus-visible,
-  a:focus-visible,
-  input:focus-visible,
-  textarea:focus-visible,
-  select:focus-visible,
-  [role="button"]:focus-visible,
-  [role="tab"]:focus-visible,
-  [role="checkbox"]:focus-visible,
-  [role="radio"]:focus-visible,
-  [role="switch"]:focus-visible,
-  [role="menuitem"]:focus-visible,
-  [tabindex]:focus-visible {
+  button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
     @apply outline-none ring-2 ring-indigo-neon-600 ring-offset-2 ring-offset-void-950;
-  }
-
-  /* Disable focus-visible for mouse users on buttons */
-  button:focus:not(:focus-visible),
-  a:focus:not(:focus-visible),
-  [role="button"]:focus:not(:focus-visible),
-  [tabindex]:focus:not(:focus-visible) {
-    outline: none;
-    box-shadow: none;
   }
 }
 
@@ -114,185 +93,16 @@
   .glow-teal {
     @apply shadow-glow-teal;
   }
-
-  /* Skeleton loaders - kept for existing components */
-  .skeleton {
-    @apply rounded-xl bg-slate-800/50;
-    background: linear-gradient(
-      90deg,
-      rgba(30, 41, 59, 0.5) 0%,
-      rgba(51, 65, 85, 0.6) 50%,
-      rgba(30, 41, 59, 0.5) 100%
-    );
-    background-size: 200% 100%;
-    animation: shimmer 1.8s ease-in-out infinite;
-  }
-
-  @keyframes shimmer {
-    0% {
-      background-position: 200% 0;
-    }
-    100% {
-      background-position: -200% 0;
-    }
-  }
-
-  /* Gradient text utilities (legacy) */
-  .gradient-text-primary {
-    @apply bg-gradient-to-br from-primary-300 via-primary-400 to-primary-500 bg-clip-text text-transparent;
-  }
-
-  .gradient-text-accent {
-    @apply bg-gradient-to-br from-accent-300 via-accent-400 to-accent-500 bg-clip-text text-transparent;
-  }
-
-  .gradient-text-brand {
-    @apply bg-gradient-to-br from-primary-400 via-accent-400 to-secondary-400 bg-clip-text text-transparent;
-  }
 }
 
 @layer utilities {
   .text-balance { text-wrap: balance; }
-
-  .scrollable {
-    @apply overflow-y-auto;
-    scrollbar-width: thin;
-    scrollbar-color: theme("colors.slate.800") theme("colors.slate.950");
-  }
-
+  .scrollable { @apply overflow-y-auto; }
   .transition-fast { @apply transition-all duration-200; }
   .transition-base { @apply transition-all duration-300; }
   .transition-slow { @apply transition-all duration-400; }
 
-  /* Motion utilities (legacy) */
-  .transition-quick {
-    transition: all 120ms cubic-bezier(0.25, 1, 0.5, 1);
-  }
-
-  .transition-base {
-    transition: all 160ms cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .transition-slow {
-    transition: all 240ms cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .transition-smooth {
-    transition: all 160ms cubic-bezier(0.25, 1, 0.5, 1);
-  }
-
-  .transition-smooth-long {
-    transition: all 240ms cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .transition-micro {
-    transition: all 120ms cubic-bezier(0.33, 1, 0.68, 1);
-  }
-
   @media (prefers-reduced-motion: reduce) {
     * { @apply !duration-0 !transition-none; }
-    .transition-quick,
-    .transition-base,
-    .transition-slow,
-    .transition-smooth,
-    .transition-smooth-long,
-    .transition-micro,
-    .animate-pulse,
-    .animate-spin,
-    button:focus-visible,
-    a:focus-visible,
-    input:focus-visible,
-    textarea:focus-visible,
-    select:focus-visible,
-    [role="button"]:focus-visible,
-    [tabindex]:focus-visible {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-    }
-  }
-
-  .hover-lift {
-    transition: transform 120ms cubic-bezier(0.25, 1, 0.5, 1),
-                box-shadow 120ms cubic-bezier(0.25, 1, 0.5, 1);
-  }
-
-  .hover-lift:hover {
-    transform: translateY(-2px);
-  }
-
-  .active-press {
-    transition: transform 160ms cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .active-press:active {
-    transform: scale(0.98);
-  }
-
-  .focus-ring-accent {
-    box-shadow: 0 0 0 2px #a855f7, 0 0 0 7px rgba(168, 85, 247, 0.25);
-  }
-
-  .container-responsive {
-    @apply px-4 sm:px-5 md:px-6 lg:px-8 xl:px-12 2xl:px-16;
-  }
-
-  .section-spacing {
-    @apply py-6 sm:py-7 md:py-8 lg:py-10 xl:py-12 2xl:py-14;
-  }
-
-  .responsive-text-sm {
-    @apply text-xs sm:text-sm;
-  }
-
-  .responsive-text-base {
-    @apply text-sm sm:text-base;
-  }
-
-  .responsive-text-lg {
-    @apply text-base sm:text-lg lg:text-xl;
-  }
-
-  .grid-responsive-cards {
-    @apply grid gap-4 sm:gap-5 md:gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4;
-  }
-
-  .grid-responsive-2col {
-    @apply grid gap-6 lg:grid-cols-2 xl:gap-8;
-  }
-
-  .mobile-only {
-    @apply block sm:hidden;
-  }
-
-  .tablet-up {
-    @apply hidden sm:block;
-  }
-
-  .desktop-only {
-    @apply hidden lg:block;
-  }
-
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border-width: 0;
-  }
-
-  .not-sr-only {
-    position: static;
-    width: auto;
-    height: auto;
-    padding: 0;
-    margin: 0;
-    overflow: visible;
-    clip: auto;
-    white-space: normal;
   }
 }

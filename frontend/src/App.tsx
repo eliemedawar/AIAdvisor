@@ -1,14 +1,2 @@
-import { AppRoutes } from "./routes/AppRoutes";
-import { ToastProvider } from "./context/ToastContext";
-
-function App() {
-  return (
-    <ToastProvider>
-      <AppRoutes />
-    </ToastProvider>
-  );
-}
-
-export default App;
-
-
+// Routing is handled directly in main.tsx via AppRoutes
+export default {};

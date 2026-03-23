@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import { Send, AlertCircle, Loader2, Plus } from 'lucide-react';
 import { AppLayout } from '../../layouts/AppLayout';
 import { Card } from '../../components/ui/Card';
@@ -146,39 +145,7 @@ export const ChatPage: React.FC = () => {
 
   return (
     <AppLayout>
-      <div className="relative h-screen overflow-hidden">
-        <motion.div
-          aria-hidden="true"
-          className="absolute inset-0"
-          style={{
-            background:
-              'radial-gradient(1200px 700px at 15% -10%, rgba(108,99,255,0.18), transparent 60%), radial-gradient(900px 600px at 90% 110%, rgba(0,210,200,0.10), transparent 60%)',
-          }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1.1, ease: 'easeOut' }}
-        />
-        <motion.div
-          aria-hidden="true"
-          className="absolute -inset-24 blur-3xl opacity-60"
-          style={{
-            background:
-              'conic-gradient(from 120deg at 50% 50%, rgba(108,99,255,0.12), rgba(0,210,200,0.08), rgba(108,99,255,0.12))',
-          }}
-          animate={{ rotate: 360 }}
-          transition={{ duration: 70, ease: 'linear', repeat: Infinity }}
-        />
-        <div
-          aria-hidden="true"
-          className="absolute inset-0"
-          style={{
-            backgroundImage: 'radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)',
-            backgroundSize: '26px 26px',
-            opacity: 0.18,
-          }}
-        />
-
-        <div className="relative z-10 flex h-full flex-col">
+      <div className="flex h-screen flex-col">
         {/* Header */}
         <div
           className="bg-cover bg-center relative border-b border-indigo-neon-600/10"
@@ -271,7 +238,6 @@ export const ChatPage: React.FC = () => {
           </p>
         </div>
       </div>
-    </div>
     </AppLayout>
   );
 };

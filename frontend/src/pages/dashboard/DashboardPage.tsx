@@ -52,12 +52,7 @@ export function DashboardPage() {
       {/* Hero */}
       <motion.div variants={fadeUp} className="relative rounded-3xl overflow-hidden mb-8 p-8 lg:p-10"
         style={{ background: 'linear-gradient(135deg, rgba(108,99,255,0.08) 0%, rgba(0,0,0,0) 60%, rgba(0,210,200,0.06) 100%)', border: '1px solid rgba(255,255,255,0.07)' }}>
-        <motion.div
-          className="absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl"
-          style={{ background: 'rgba(108,99,255,0.10)' }}
-          animate={{ x: [0, -10, 6, 0], y: [0, 8, -6, 0] }}
-          transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-        />
+        <div className="absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl" style={{ background: 'rgba(108,99,255,0.07)' }} />
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <p className="text-sm font-medium mb-1" style={{ color: 'rgba(255,255,255,0.35)' }}>

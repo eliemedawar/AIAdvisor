@@ -1,45 +1,22 @@
-/**
- * Core Component Library - Centralized Exports
- * 
- * All reusable UI primitives following the design system
- */
+// Neural Canvas UI components
+export * from './ui/Button';
+export * from './ui/Card';
+export * from './ui/Input';
+export * from './ui/Badge';
+export * from './ui/Modal';
+export * from './ui/Select';
+export * from './ui/Spinner';
 
-// Typography
-export { Heading, Text, Overline } from "./core/Typography";
-
-// Form Components
-export { Input } from "./core/Input";
-export { Select } from "./core/Select";
-export { Textarea } from "./core/Textarea";
-export { ChatInput } from "./core/ChatInput";
-export { Button } from "./core/Button";
-
-// Structural Components
-export { Card } from "./core/Card";
-export { SectionHeader } from "./core/SectionHeader";
-export { Avatar } from "./core/Avatar";
-export { Badge, Chip } from "./core/Badge";
-export { StatCard } from "./core/StatCard";
-
-// Navigation
-export { SidebarNavItem } from "./core/SidebarNavItem";
-
-// Overlays
-export { Modal } from "./core/Modal";
-export { Toast } from "./core/Toast";
-
-// Feedback Components
-export { EmptyState } from "./core/EmptyState";
-export {
-  Skeleton,
-  SkeletonText,
-  SkeletonCard,
-  SkeletonList,
-  SkeletonAvatar,
-  SkeletonChatMessage,
-  SkeletonStatCard,
-} from "./core/Skeleton";
-
-// Layout
-export { PageShell, PageSection } from "./layout/PageShell";
-
+// Stubs for legacy imports from old component tree
+// (keeps any Manus-generated pages from crashing at import time)
+export const PageShell = ({ children }: any) => children;
+export const PageSection = ({ children }: any) => children;
+export const SectionHeader = () => null;
+export const StatCard = () => null;
+export const EmptyState = ({ action }: any) => action ?? null;
+export const SkeletonCard = () => null;
+export const SkeletonList = () => null;
+export const SkeletonStatCard = () => null;
+export const SkeletonChatMessage = () => null;
+export const Heading = ({ children }: any) => children;
+export const Text = ({ children }: any) => children;
