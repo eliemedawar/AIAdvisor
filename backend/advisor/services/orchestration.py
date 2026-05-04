@@ -10,13 +10,74 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
+# ── Course-code correction helpers ───────────────────────────────────────────
+# Used to enforce that proposed actions always use the course from the current
+# user message, not stale course codes from the conversation history.
+
+_COURSE_CODE_RE = re.compile(r"\b([A-Z]{2,5})\s*(\d{3,4})\b", re.IGNORECASE)
+
+
+def _replace_course_in_text(text: str, wrong: str, correct: str) -> str:
+    """Replace occurrences of *wrong* course code with *correct* in text."""
+    if not text or not wrong:
+        return text
+    parts = wrong.split()
+    if len(parts) == 2:
+        pattern = re.compile(
+            r"\b" + re.escape(parts[0]) + r"\s*" + re.escape(parts[1]) + r"\b",
+            re.IGNORECASE,
+        )
+        return pattern.sub(correct, text)
+    return text.replace(wrong, correct)
+
+
+def _fix_proposed_action_course_codes(
+    actions: list[dict],
+    last_user_message: str,
+) -> list[dict]:
+    """
+    Post-processing guardrail: if the last user message names a course code,
+    ensure every write action (create_assignment / create_calendar_event /
+    create_task) uses that course code. Replaces both the course_code field
+    and any occurrence in title / description.
+    select_elective actions are never modified.
+    """
+    if not last_user_message or not actions:
+        return actions
+
+    m = _COURSE_CODE_RE.search(last_user_message)
+    if not m:
+        return actions
+
+    correct = f"{m.group(1).upper()} {m.group(2)}"
+    correct_key = correct.upper().replace(" ", "")
+
+    fixed: list[dict] = []
+    for action in actions:
+        a = dict(action)
+        if a.get("type") in ("create_assignment", "create_calendar_event", "create_task"):
+            existing = (a.get("course_code") or "").strip()
+            if existing and existing.upper().replace(" ", "") != correct_key:
+                a["course_code"] = correct
+                for field in ("title", "description"):
+                    if a.get(field):
+                        a[field] = _replace_course_in_text(a[field], existing, correct)
+        fixed.append(a)
+    return fixed
+
+from django.utils import timezone as django_tz
+
 from .agents import AGENT_RUNNERS
 from .clarifier import run_clarifier
 from .context import build_student_context
 from .llm import LLMServiceError
 from .merge import merge_agent_replies
 from .memory import build_conversation_summary
-from .action_planner import run_action_planner
+from .action_planner import (
+    run_action_planner,
+    extract_event_plan_from_message,
+    build_event_plan_from_actions,
+)
 from .router import run_router
 from .types import ActionPlanOutput
 
@@ -198,6 +259,17 @@ def get_advisor_reply_payload(
             extra=log_extra,
         )
 
+        # Extract EventPlan deterministically from the last user message.
+        # This becomes the single source of truth for course/datetime throughout.
+        last_user = next(
+            (m for m in reversed(messages) if (m.get("role") or "").lower() == "user"),
+            None,
+        )
+        last_user_content = (last_user.get("content") if last_user else "") or ""
+        last_user_lower = last_user_content.lower()
+        now = django_tz.now()
+        event_plan = extract_event_plan_from_message(last_user_content, user_timezone, now)
+
         run_clarifier_step = (
             router_output.confidence < 0.45
             or router_output.agents == ["advisor"]
@@ -218,6 +290,7 @@ def get_advisor_reply_payload(
                     return {
                         "reply_text": clarifier_out.question.strip(),
                         "proposed_actions": [],
+                        "event_plan": None,
                     }
             except Exception as e:
                 logger.warning("clarifier failed, continuing: %s", e, extra=log_extra)
@@ -237,6 +310,7 @@ def get_advisor_reply_payload(
                 request_id=request_id,
                 conversation_summary=conversation_summary,
                 attached_context=attached_context,
+                event_plan=event_plan,
             )
             return agent_name, reply
 
@@ -275,7 +349,7 @@ def get_advisor_reply_payload(
                 ordered_replies[name] = replies[name]
 
         if not ordered_replies:
-            return {"reply_text": FALLBACK_REPLY, "proposed_actions": []}
+            return {"reply_text": FALLBACK_REPLY, "proposed_actions": [], "event_plan": None}
 
         reply_text = merge_agent_replies(ordered_replies)
 
@@ -283,12 +357,6 @@ def get_advisor_reply_payload(
         # Heuristic gate: scan the last user message AND recent conversation
         # context so follow-up requests like "can u add it" still trigger
         # the action planner when a date was mentioned earlier.
-        last_user = next(
-            (m for m in reversed(messages) if (m.get("role") or "").lower() == "user"),
-            None,
-        )
-        last_user_content = (last_user.get("content") if last_user else "") or ""
-        last_user_lower = last_user_content.lower()
 
         # Build a window of recent conversation text (last 6 messages) for
         # date-signal detection so "can u add it to the calendar" still passes
@@ -347,7 +415,10 @@ def get_advisor_reply_payload(
         def _has_date_in(text: str) -> bool:
             return bool(
                 re.search(r"\b\d{4}-\d{2}-\d{2}\b", text)
+                # "5 jan" format
                 or re.search(r"\b\d{1,2}\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\b", text)
+                # "May 12" / "January 5th" format
+                or re.search(r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+\d{1,2}\b", text)
                 or "today" in text
                 or "tomorrow" in text
                 or "next week" in text
@@ -368,9 +439,57 @@ def get_advisor_reply_payload(
         # (so follow-up "add it" messages inherit context).
         has_date_signal = _has_date_in(last_user_lower) or _has_date_in(recent_window)
 
+        # Elective selection intent: user explicitly picks a course for a slot
+        elective_select_verbs = ["select", "choose", "pick", "apply", "use", "assign"]
+        has_elective_select_intent = (
+            any(k in last_user_lower for k in elective_select_verbs)
+            and ("elective" in last_user_lower or "elective" in recent_window)
+            and bool(
+                context.get("academic_plan", {}).get("elective_placeholders")
+            )
+        )
+
+        # Study plan intent: user wants AI to generate a structured study plan
+        # (doesn't need a specific date — AI will propose slots across the coming week)
+        study_plan_phrases = [
+            "study plan",
+            "study schedule",
+            "study session",
+            "plan my week",
+            "plan my study",
+            "make a plan",
+            "help me study",
+            "study for my",
+            "organize my",
+            "organize tasks",
+        ]
+        has_study_plan_intent = any(k in last_user_lower for k in study_plan_phrases)
+        if not has_study_plan_intent:
+            # Generic: "plan"/"schedule"/"organize" combined with a learning context keyword
+            has_study_plan_intent = (
+                any(k in last_user_lower for k in ["plan", "schedule", "organize"])
+                and any(k in last_user_lower for k in ["course", "exam", "deadline", "week", "study", "task"])
+            )
+
+        # Deadline statement intent: user declares an upcoming academic deadline
+        # e.g. "I have a homework in EECE 451 due next Tuesday at 8 PM"
+        # e.g. "I have an exam in INDE 301 on May 12 at 9 AM"
+        _deadline_type_words = ["exam", "quiz", "homework", "project", "report", "midterm", "final"]
+        _deadline_declaration_phrases = ["have a ", "have an ", "is due", "are due", "due on", "scheduled for", "scheduled on"]
+        has_deadline_statement_intent = (
+            any(k in last_user_lower for k in _deadline_type_words)
+            and _has_date_in(last_user_lower)
+            and any(k in last_user_lower for k in _deadline_declaration_phrases)
+        )
+
         proposed_actions = []
         action_plan_confidence: float | None = None
-        if has_write_intent and has_date_signal:
+        if (
+            (has_write_intent and has_date_signal)
+            or has_elective_select_intent
+            or has_study_plan_intent
+            or has_deadline_statement_intent
+        ):
             action_plan: ActionPlanOutput = run_action_planner(
                 user=user,
                 context=context,
@@ -379,6 +498,7 @@ def get_advisor_reply_payload(
                 request_id=request_id,
                 user_timezone=user_timezone,
                 attached_context=attached_context,
+                event_plan=event_plan,
             )
             action_plan_confidence = action_plan.confidence
             proposed_actions = (
@@ -392,10 +512,21 @@ def get_advisor_reply_payload(
             elapsed_ms,
             extra=log_extra,
         )
+        # Deterministic post-processing: fix any wrong course codes in the
+        # proposed actions against what the user actually said.
+        raw_actions = [a.model_dump() for a in proposed_actions]
+        corrected_actions = _fix_proposed_action_course_codes(raw_actions, last_user_content)
+
+        # Build full EventPlan with study_sessions/tasks populated from actions.
+        full_event_plan = None
+        if event_plan is not None:
+            full_event_plan = build_event_plan_from_actions(event_plan, corrected_actions)
+
         return {
             "reply_text": reply_text,
-            "proposed_actions": [a.model_dump() for a in proposed_actions],
+            "proposed_actions": corrected_actions,
             "action_plan_confidence": action_plan_confidence,
+            "event_plan": full_event_plan.model_dump() if full_event_plan else None,
         }
     except LLMServiceError as e:
         logger.exception("orchestration_payload LLM error: %s", e, extra=log_extra)

@@ -19,6 +19,7 @@ export interface StudyTimeByCourse {
 
 export interface DashboardOverview {
   current_gpa: number | null;
+  target_gpa: number | null;
   upcoming_deadlines: Assignment[];
   weekly_tasks: Task[];
   study_time_this_week_hours: number;

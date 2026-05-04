@@ -1,0 +1,460 @@
+{
+  "CCE": {
+    "program": "Computer and Communications Engineering",
+    "source": "AUB ECE Department Undergraduate Catalogue 2019-20",
+    "total_credits": 143,
+    "terms": [
+      {
+        "term_number": 1,
+        "label": "Term I",
+        "season": "Fall",
+        "year": 1,
+        "courses": [
+          {
+            "code": "FEAA 200",
+            "name": "Introduction to Engineering and Architecture",
+            "credits": 3,
+            "category": "Core"
+          },
+          {
+            "code": "EECE 210",
+            "name": "Electric Circuits",
+            "credits": 3,
+            "category": "ECE Core"
+          },
+          {
+            "code": "ENGL 203",
+            "name": "Academic English",
+            "credits": 3,
+            "category": "English"
+          },
+          {
+            "code": "MATH 201",
+            "name": "Calculus and Analytic Geometry III",
+            "credits": 3,
+            "category": "Mathematics"
+          },
+          {
+            "code": "MATH/CMPS 211",
+            "name": "Discrete Structures",
+            "credits": 3,
+            "category": "Mathematics"
+          }
+        ],
+        "term_credits": 15
+      },
+      {
+        "term_number": 2,
+        "label": "Term II",
+        "season": "Spring",
+        "year": 1,
+        "courses": [
+          {
+            "code": "EECE 230",
+            "name": "Introduction to Programming",
+            "credits": 3,
+            "category": "ECE Core"
+          },
+          {
+            "code": "EECE 290",
+            "name": "Analog Signal Processing",
+            "credits": 3,
+            "category": "ECE Core"
+          },
+          {
+            "code": "MATH 202",
+            "name": "Differential Equations",
+            "credits": 3,
+            "category": "Mathematics"
+          },
+          {
+            "code": "MATH 218/219",
+            "name": "Linear Algebra",
+            "credits": 3,
+            "category": "Mathematics"
+          },
+          {
+            "code": "PHYS 210",
+            "name": "Introductory Physics II",
+            "credits": 3,
+            "category": "Science"
+          },
+          {
+            "code": "PHYS 210L",
+            "name": "Introductory Physics Laboratory II",
+            "credits": 1,
+            "category": "Science Lab"
+          }
+        ],
+        "term_credits": 16
+      },
+      {
+        "term_number": 3,
+        "label": "Term III",
+        "season": "Summer",
+        "year": 1,
+        "courses": [
+          {
+            "code": "CHEM 201/202",
+            "name": "Chemistry Course",
+            "credits": 3,
+            "category": "Science"
+          },
+          {
+            "code": "CHEM 203/205",
+            "name": "Chemistry Laboratory",
+            "credits": 2,
+            "category": "Science Lab"
+          },
+          {
+            "code": "HSS Elective",
+            "name": "Humanities or Social Sciences Elective",
+            "credits": 3,
+            "category": "General Education"
+          }
+        ],
+        "term_credits": 8
+      },
+      {
+        "term_number": 4,
+        "label": "Term IV",
+        "season": "Fall",
+        "year": 2,
+        "courses": [
+          {
+            "code": "EECE 310",
+            "name": "Electronics",
+            "credits": 3,
+            "category": "ECE Core"
+          },
+          {
+            "code": "EECE 310L",
+            "name": "Electric Circuits Laboratory",
+            "credits": 1,
+            "category": "ECE Lab"
+          },
+          {
+            "code": "EECE 320",
+            "name": "Digital Systems Design",
+            "credits": 3,
+            "category": "ECE Core"
+          },
+          {
+            "code": "EECE 330",
+            "name": "Data Structures and Algorithms",
+            "credits": 3,
+            "category": "ECE Core"
+          },
+          {
+            "code": "EECE 380",
+            "name": "Engineering Electromagnetics",
+            "credits": 3,
+            "category": "ECE Core"
+          },
+          {
+            "code": "STAT 230/233",
+            "name": "Introduction to Probability and Random Variables",
+            "credits": 3,
+            "category": "Mathematics/Statistics"
+          }
+        ],
+        "term_credits": 16
+      },
+      {
+        "term_number": 5,
+        "label": "Term V",
+        "season": "Spring",
+        "year": 2,
+        "courses": [
+          {
+            "code": "EECE 311",
+            "name": "Electronic Circuits",
+            "credits": 3,
+            "category": "ECE Core"
+          },
+          {
+            "code": "EECE 321",
+            "name": "Computer Organization",
+            "credits": 3,
+            "category": "ECE Core"
+          },
+          {
+            "code": "EECE 321L",
+            "name": "Computer Organization Laboratory",
+            "credits": 1,
+            "category": "ECE Lab"
+          },
+          {
+            "code": "EECE 340",
+            "name": "Signals and Systems",
+            "credits": 3,
+            "category": "ECE Core"
+          },
+          {
+            "code": "EECE 350",
+            "name": "Computer Networks",
+            "credits": 3,
+            "category": "ECE Core"
+          },
+          {
+            "code": "Science Elective",
+            "name": "Science Elective",
+            "credits": 3,
+            "category": "Science Elective"
+          }
+        ],
+        "term_credits": 16
+      },
+      {
+        "term_number": 6,
+        "label": "Term VI",
+        "season": "Summer",
+        "year": 2,
+        "courses": [
+          {
+            "code": "ENGL 206",
+            "name": "Technical English",
+            "credits": 3,
+            "category": "English"
+          },
+          {
+            "code": "ARAB",
+            "name": "Arabic Course",
+            "credits": 3,
+            "category": "Arabic"
+          },
+          {
+            "code": "HSS Elective",
+            "name": "Humanities or Social Sciences Elective",
+            "credits": 3,
+            "category": "General Education"
+          }
+        ],
+        "term_credits": 9
+      },
+      {
+        "term_number": 7,
+        "label": "Term VII",
+        "season": "Fall",
+        "year": 3,
+        "courses": [
+          {
+            "code": "EECE 442",
+            "name": "Communication Systems",
+            "credits": 3,
+            "category": "ECE Core"
+          },
+          {
+            "code": "EECE 3xx/4xx",
+            "name": "Restricted Elective",
+            "credits": 3,
+            "category": "CCE Restricted Elective"
+          },
+          {
+            "code": "EECE 3xx/4xx",
+            "name": "Restricted Elective",
+            "credits": 3,
+            "category": "CCE Restricted Elective"
+          },
+          {
+            "code": "MATH Elective",
+            "name": "Math Elective",
+            "credits": 3,
+            "category": "Mathematics Elective"
+          },
+          {
+            "code": "INDE 301",
+            "name": "Engineering Economy",
+            "credits": 3,
+            "category": "Engineering Management"
+          }
+        ],
+        "term_credits": 15
+      },
+      {
+        "term_number": 8,
+        "label": "Term VIII",
+        "season": "Spring",
+        "year": 3,
+        "courses": [
+          {
+            "code": "EECE 3xx/4xx",
+            "name": "Restricted Elective",
+            "credits": 3,
+            "category": "CCE Restricted Elective"
+          },
+          {
+            "code": "EECE 3xx/4xx",
+            "name": "Restricted Elective",
+            "credits": 3,
+            "category": "CCE Restricted Elective"
+          },
+          {
+            "code": "EECE Elective",
+            "name": "EECE Elective",
+            "credits": 3,
+            "category": "EECE Elective"
+          },
+          {
+            "code": "EECE 410L",
+            "name": "System Integration Laboratory",
+            "credits": 1,
+            "category": "ECE Lab"
+          },
+          {
+            "code": "INDE 410",
+            "name": "Engineering Ethics",
+            "credits": 3,
+            "category": "Humanities"
+          },
+          {
+            "code": "HSS Elective",
+            "name": "Humanities or Social Sciences Elective",
+            "credits": 3,
+            "category": "General Education"
+          }
+        ],
+        "term_credits": 16
+      },
+      {
+        "term_number": 9,
+        "label": "Term IX",
+        "season": "Summer",
+        "year": 3,
+        "courses": [
+          {
+            "code": "EECE 500",
+            "name": "Approved Experience",
+            "credits": 1,
+            "category": "Internship/Approved Experience"
+          }
+        ],
+        "term_credits": 1
+      },
+      {
+        "term_number": 10,
+        "label": "Term X",
+        "season": "Fall",
+        "year": 4,
+        "courses": [
+          {
+            "code": "EECE 501",
+            "name": "Final Year Project",
+            "credits": 3,
+            "category": "Final Year Project"
+          },
+          {
+            "code": "EECE Restricted Laboratory",
+            "name": "Restricted Laboratory",
+            "credits": 1,
+            "category": "ECE Restricted Lab"
+          },
+          {
+            "code": "EECE Elective",
+            "name": "EECE Elective",
+            "credits": 3,
+            "category": "EECE Elective"
+          },
+          {
+            "code": "Technical Elective",
+            "name": "Technical Elective",
+            "credits": 3,
+            "category": "Technical Elective"
+          },
+          {
+            "code": "Technical Elective",
+            "name": "Technical Elective",
+            "credits": 3,
+            "category": "Technical Elective"
+          },
+          {
+            "code": "HSS Elective",
+            "name": "Humanities or Social Sciences Elective",
+            "credits": 3,
+            "category": "General Education"
+          }
+        ],
+        "term_credits": 16
+      },
+      {
+        "term_number": 11,
+        "label": "Term XI",
+        "season": "Spring",
+        "year": 4,
+        "courses": [
+          {
+            "code": "EECE 502",
+            "name": "Final Year Project",
+            "credits": 3,
+            "category": "Final Year Project"
+          },
+          {
+            "code": "EECE Elective Laboratory",
+            "name": "Elective Laboratory",
+            "credits": 1,
+            "category": "ECE Elective Lab"
+          },
+          {
+            "code": "EECE Elective",
+            "name": "EECE Elective",
+            "credits": 3,
+            "category": "EECE Elective"
+          },
+          {
+            "code": "Technical Elective",
+            "name": "Technical Elective",
+            "credits": 3,
+            "category": "Technical Elective"
+          },
+          {
+            "code": "Technical Elective",
+            "name": "Technical Elective",
+            "credits": 3,
+            "category": "Technical Elective"
+          },
+          {
+            "code": "HSS Elective",
+            "name": "Humanities or Social Sciences Elective",
+            "credits": 3,
+            "category": "General Education"
+          }
+        ],
+        "term_credits": 16
+      }
+    ],
+    "restricted_electives": {
+      "Area 1: Computer Hardware Systems": [
+        "EECE 412",
+        "EECE 420",
+        "EECE 421",
+        "EECE 422",
+        "EECE 423",
+        "EECE 425"
+      ],
+      "Area 2: Communications and Networking": [
+        "EECE 451",
+        "EECE 455",
+        "EECE 491"
+      ],
+      "Area 3: Software Systems": [
+        "EECE 331",
+        "EECE 332",
+        "EECE 334",
+        "EECE 338",
+        "EECE 430",
+        "EECE 432",
+        "EECE 433",
+        "EECE 437"
+      ]
+    },
+    "restricted_labs": [
+      "EECE 412L",
+      "EECE 430L",
+      "EECE 431L",
+      "EECE 434L",
+      "EECE 435L",
+      "EECE 442L",
+      "EECE 451L"
+    ]
+  }
+}

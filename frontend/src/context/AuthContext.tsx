@@ -61,6 +61,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     void bootstrapUser();
   }, [bootstrapUser]);
 
+  // Force logout when httpClient signals that the refresh token has expired
+  useEffect(() => {
+    const handleExpired = () => {
+      setTokens(null);
+      setUser(null);
+    };
+    window.addEventListener("auth:session-expired", handleExpired);
+    return () => window.removeEventListener("auth:session-expired", handleExpired);
+  }, []);
+
   const login = useCallback(async (payload: LoginRequest) => {
     const res = await authApi.login(payload);
     const newTokens: StoredTokens = {

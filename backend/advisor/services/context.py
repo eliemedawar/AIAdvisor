@@ -8,21 +8,21 @@ from typing import Any
 
 from django.utils import timezone
 
+from planner.electives import ELECTIVE_LISTS
 from planner.models import Assignment, CalendarEvent, Course, Task
 from profiles.models import StudentProfile
 
-CONTEXT_VERSION = "1.0"
+CONTEXT_VERSION = "1.2"
 
-# Limits to keep token usage bounded; no list may exceed these
-MAX_ASSIGNMENTS = 5
-MAX_TASKS = 10
-TASK_DAYS_AHEAD = 7
-MAX_EVENTS = 5
+MAX_ASSIGNMENTS = 15
+MAX_TASKS = 15
+TASK_DAYS_AHEAD = 14
+MAX_EVENTS = 14
 MAX_COURSES_CURRENT_TERM = 20
+MAX_ELECTIVE_OPTIONS_PER_TYPE = 20
 
 
 def _metadata_base(now: Any) -> dict[str, Any]:
-    """Always-present metadata fields for debugging and consistency."""
     return {
         "context_version": CONTEXT_VERSION,
         "generated_at": now.isoformat(),
@@ -35,17 +35,95 @@ def _metadata_base(now: Any) -> dict[str, Any]:
     }
 
 
+# ── Public helper functions ─────────────────────────────────────────────────
+
+def get_completed_courses(user) -> list[dict[str, Any]]:
+    return list(
+        Course.objects.filter(user=user, status=Course.STATUS_COMPLETED)
+        .order_by("term", "code")
+        .values("id", "code", "name", "credits", "term", "category", "requirement_type", "original_placeholder")
+    )
+
+
+def get_current_courses(user) -> list[dict[str, Any]]:
+    return list(
+        Course.objects.filter(user=user, status=Course.STATUS_IN_PROGRESS)
+        .order_by("term", "code")
+        .values("id", "code", "name", "credits", "term", "category", "requirement_type", "original_placeholder")
+    )
+
+
+def get_planned_courses(user) -> list[dict[str, Any]]:
+    return list(
+        Course.objects.filter(user=user, status=Course.STATUS_PLANNED)
+        .order_by("term", "code")
+        .values("id", "code", "name", "credits", "term", "category", "requirement_type", "original_placeholder")
+    )
+
+
+def get_remaining_requirements(user) -> dict[str, Any]:
+    planned = get_planned_courses(user)
+    return {
+        "elective_placeholders": [c for c in planned if c["requirement_type"] and not c["original_placeholder"]],
+        "planned_core": [c for c in planned if not c["requirement_type"]],
+    }
+
+
+def get_available_electives(requirement_type: str) -> list[dict]:
+    return ELECTIVE_LISTS.get(requirement_type, [])
+
+
+def validate_elective_selection(course_code: str, requirement_type: str) -> bool:
+    options = ELECTIVE_LISTS.get(requirement_type, [])
+    return any(e["code"].lower() == course_code.lower() for e in options)
+
+
+def _build_academic_plan(user) -> dict[str, Any]:
+    all_courses = list(
+        Course.objects.filter(user=user)
+        .order_by("term", "code")
+        .values(
+            "id", "code", "name", "credits", "term", "category",
+            "status", "requirement_type", "original_placeholder",
+        )
+    )
+
+    completed = [c for c in all_courses if c["status"] == Course.STATUS_COMPLETED]
+    in_progress = [c for c in all_courses if c["status"] == Course.STATUS_IN_PROGRESS]
+    planned = [c for c in all_courses if c["status"] == Course.STATUS_PLANNED]
+
+    # Unresolved placeholder: slot exists (requirement_type set) but no real course chosen yet
+    elective_placeholders = [
+        c for c in planned
+        if c["requirement_type"] and not c["original_placeholder"]
+    ]
+
+    # Resolved electives: student already chose a real course for the slot
+    selected_electives = [c for c in all_courses if c["original_placeholder"]]
+
+    needed_types = {c["requirement_type"] for c in elective_placeholders if c["requirement_type"]}
+    available_electives: dict[str, list] = {
+        req_type: ELECTIVE_LISTS.get(req_type, [])[:MAX_ELECTIVE_OPTIONS_PER_TYPE]
+        for req_type in needed_types
+    }
+
+    return {
+        "completed": completed,
+        "in_progress": in_progress,
+        "planned": planned,
+        "elective_placeholders": elective_placeholders,
+        "selected_electives": selected_electives,
+        "available_electives": available_electives,
+        "credits_completed": sum(c["credits"] or 0 for c in completed),
+        "credits_in_progress": sum(c["credits"] or 0 for c in in_progress),
+    }
+
+
 def build_student_context(user) -> dict[str, Any]:
-    """
-    Build a trimmed, structured context for the given user.
-    All lists are sorted by date ascending and capped by MAX_* limits.
-    Context always contains metadata with date_iso, timezone, and counts.
-    """
     now = timezone.now()
     seven_days_later = now + timedelta(days=TASK_DAYS_AHEAD)
     metadata = _metadata_base(now)
 
-    # Profile
     profile_obj = StudentProfile.objects.filter(user=user).first()
     profile: dict[str, Any] = {}
     if profile_obj:
@@ -58,7 +136,6 @@ def build_student_context(user) -> dict[str, Any]:
             "study_style": profile_obj.study_style or "",
         }
 
-    # Assignments: next 5 by due_at ascending, only relevant fields
     assignments_qs = (
         Assignment.objects.filter(course__user=user, due_at__gte=now)
         .select_related("course")
@@ -76,11 +153,9 @@ def build_student_context(user) -> dict[str, Any]:
         }
         for a in assignments_qs
     ]
-    # Ensure sorted by due_at ascending (queryset already is; keep explicit for safety)
     assignments.sort(key=lambda x: x["due_at"])
     metadata["num_assignments"] = len(assignments)
 
-    # Tasks: next 7 days, max 10, sorted by due_at ascending
     tasks_qs = (
         Task.objects.filter(
             user=user,
@@ -106,7 +181,6 @@ def build_student_context(user) -> dict[str, Any]:
     tasks.sort(key=lambda x: (x["due_at"] or ""))
     metadata["num_tasks"] = len(tasks)
 
-    # Events: next 5, sorted by start_at ascending
     events_qs = (
         CalendarEvent.objects.filter(user=user, start_at__gte=now)
         .select_related("course", "assignment")
@@ -125,20 +199,21 @@ def build_student_context(user) -> dict[str, Any]:
     events.sort(key=lambda x: x["start_at"])
     metadata["num_events"] = len(events)
 
-    # Courses: current term only (most recent term by name), capped
+    # Current-term snapshot kept for scheduling agent (backward compat)
     courses_qs = Course.objects.filter(user=user).order_by("-term")
-    current_term = None
-    if courses_qs.exists():
-        current_term = courses_qs.first().term
+    current_term = courses_qs.first().term if courses_qs.exists() else None
     courses_qs = (
         Course.objects.filter(user=user, term=current_term)
         .order_by("code")[:MAX_COURSES_CURRENT_TERM]
-    ) if current_term else Course.objects.none()
+        if current_term else Course.objects.none()
+    )
     courses = [
         {"name": c.name, "code": c.code, "term": c.term, "credits": c.credits}
         for c in courses_qs
     ]
     metadata["num_courses"] = len(courses)
+
+    academic_plan = _build_academic_plan(user)
 
     return {
         "profile": profile,
@@ -146,16 +221,13 @@ def build_student_context(user) -> dict[str, Any]:
         "tasks": tasks,
         "events": events,
         "courses": courses,
+        "academic_plan": academic_plan,
         "metadata": metadata,
     }
 
 
 def format_context_for_agent(context: dict[str, Any], agent_name: str) -> str:
-    """
-    Turn structured context into a compact text block for an agent's prompt.
-    Keeps token usage bounded by using only the pre-trimmed context.
-    """
-    lines = []
+    lines: list[str] = []
     meta = context.get("metadata") or {}
     lines.append(
         f"[Context v{meta.get('context_version', '?')} @ {meta.get('generated_at', '')} "
@@ -178,31 +250,107 @@ def format_context_for_agent(context: dict[str, Any], agent_name: str) -> str:
         if profile.get("study_style"):
             lines.append(f"Study style: {profile['study_style']}")
 
-    # Scheduling-focused
     if agent_name in ("scheduling", "advisor"):
         assignments = context.get("assignments") or []
         if assignments:
-            lines.append("\n--- Upcoming assignments (next 5) ---")
+            lines.append(f"\n--- Upcoming assignments (next {len(assignments)}, sorted by deadline) ---")
             for a in assignments:
-                lines.append(f"  - {a['title']} | due {a['due_at']} | {a['course']} | {a['status']}")
+                atype = (a.get("type") or "?").upper()
+                due = a["due_at"][:16].replace("T", " ")
+                lines.append(
+                    f"  - [{atype}] {a['title']} | course: {a['course']} ({a.get('course_name','')}) "
+                    f"| due: {due} | status: {a['status']}"
+                )
         tasks = context.get("tasks") or []
         if tasks:
-            lines.append("\n--- Tasks (next 7 days, max 10) ---")
+            lines.append(f"\n--- Existing tasks (next {TASK_DAYS_AHEAD} days, max {MAX_TASKS}) ---")
             for t in tasks:
-                lines.append(f"  - {t['title']} | due {t.get('due_at', '?')} | {t['priority']} | {t['status']}")
+                due = (t.get("due_at") or "no date")[:16].replace("T", " ")
+                lines.append(
+                    f"  - {t['title']} | due: {due} | priority: {t['priority']} | status: {t['status']}"
+                    + (f" | course: {t['course']}" if t.get("course") else "")
+                )
         events = context.get("events") or []
         if events:
-            lines.append("\n--- Next events ---")
+            lines.append(f"\n--- Existing calendar events (next {MAX_EVENTS} days) ---")
             for e in events:
-                lines.append(f"  - {e['title']} | {e['start_at']}–{e['end_at']} | {e['type']}")
+                start = e["start_at"][:16].replace("T", " ")
+                end = e["end_at"][11:16]
+                lines.append(
+                    f"  - {e['title']} | {start}–{end} | type: {e['type']}"
+                    + (f" | course: {e['course']}" if e.get("course") else "")
+                )
 
-    # Course/progress-focused
-    if agent_name in ("course_progress", "advisor"):
+    # Scheduling + advisor agent: show current-term courses for course code lookup
+    if agent_name in ("scheduling", "advisor"):
         courses = context.get("courses") or []
         if courses:
-            lines.append("\n--- Current term courses ---")
+            lines.append("\n--- Current term courses (valid course codes) ---")
             for c in courses:
                 cred = f" ({c['credits']} cr)" if c.get("credits") else ""
                 lines.append(f"  - {c['code']}: {c['name']}{cred}")
+
+    # Course/progress agent: full academic plan
+    if agent_name in ("course_progress", "advisor"):
+        plan = context.get("academic_plan") or {}
+        if plan:
+            completed = plan.get("completed", [])
+            in_progress = plan.get("in_progress", [])
+            planned = plan.get("planned", [])
+            placeholders = plan.get("elective_placeholders", [])
+            selected = plan.get("selected_electives", [])
+            available = plan.get("available_electives", {})
+            credits_done = plan.get("credits_completed", 0)
+            credits_ip = plan.get("credits_in_progress", 0)
+
+            lines.append("\n--- Academic Plan ---")
+            lines.append(f"Credits completed: {credits_done} | In progress: {credits_ip}")
+
+            if completed:
+                codes = ", ".join(c["code"] for c in completed)
+                lines.append(f"\nCompleted ({len(completed)} courses, {credits_done} cr):\n  {codes}")
+
+            if in_progress:
+                lines.append("\nIn-progress (current term):")
+                for c in in_progress:
+                    lines.append(
+                        f"  - {c['code']}: {c['name']} ({c.get('credits', '?')} cr) [{c['term']}]"
+                    )
+
+            if placeholders:
+                lines.append(
+                    "\nUnresolved elective slots (student must still choose a real course):"
+                )
+                for c in placeholders:
+                    lines.append(
+                        f"  - ID#{c['id']} | Slot: {c['code']} | Term: {c['term']} "
+                        f"| Category: {c['requirement_type']}"
+                    )
+
+            if selected:
+                lines.append("\nResolved electives (already chosen):")
+                for c in selected:
+                    lines.append(
+                        f"  - {c['code']}: {c['name']} (was: {c['original_placeholder']}) [{c['term']}]"
+                    )
+
+            planned_core = [c for c in planned if not c.get("requirement_type")]
+            if planned_core:
+                shown = planned_core[:10]
+                lines.append(
+                    f"\nPlanned core courses ({len(planned_core)} total, next {len(shown)} shown):"
+                )
+                for c in shown:
+                    lines.append(
+                        f"  - {c['code']}: {c['name']} ({c.get('credits', '?')} cr) [{c['term']}]"
+                    )
+
+            if available:
+                lines.append("\nAvailable electives by category (for unresolved slots):")
+                for req_type, elec_list in available.items():
+                    entries = " | ".join(
+                        f"{e['code']} {e['name']} ({e['credits']} cr)" for e in elec_list
+                    )
+                    lines.append(f"  [{req_type}]: {entries}")
 
     return "\n".join(lines) if lines else "No student context available."

@@ -74,6 +74,8 @@ httpClient.interceptors.response.use(
       } catch (refreshError) {
         clearStoredTokens();
         onRefreshed(null);
+        // Notify AuthContext so it can clear state and redirect to login
+        window.dispatchEvent(new Event("auth:session-expired"));
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

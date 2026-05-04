@@ -56,14 +56,15 @@ export const WeeklyTasksChart = ({ data, className }: WeeklyTasksChartProps) => 
       <Card variant="elevated" padding="md" className={className}>
         <SectionHeader
           title="Weekly Tasks"
-          subtitle="Track your daily task completion"
+          subtitle="Completed vs. Planned"
           small
         />
-        <div className="mt-4">
+        <div className="mt-3">
           <EmptyState
+            compact
             icon={<CheckCircle2 className="h-8 w-8" />}
             title="No task data yet"
-            description="Start planning your week to see task completion insights."
+            description="Plan your week to see task completion insights."
             action={<Button size="sm" variant="primary">Plan Your Week</Button>}
           />
         </div>
@@ -107,8 +108,8 @@ export const WeeklyTasksChart = ({ data, className }: WeeklyTasksChartProps) => 
         small
       />
       
-      <div className="mt-5">
-        <ResponsiveContainer width="100%" height={238}>
+      <div className="mt-4">
+        <ResponsiveContainer width="100%" height={175}>
           <BarChart data={data} margin={{ top: 5, right: 12, left: -12, bottom: 0 }} barGap={6}>
             <CartesianGrid strokeDasharray="2 6" stroke={chartColors.grid} vertical={false} />
             <XAxis
@@ -157,29 +158,20 @@ export const WeeklyTasksChart = ({ data, className }: WeeklyTasksChartProps) => 
         </ResponsiveContainer>
       </div>
 
-      {/* Insight Text */}
-      <div className="mt-4 flex flex-col gap-3 rounded-xl border border-slate-800/60 bg-slate-950/60 p-4 shadow-elevation-flat backdrop-blur-sm sm:flex-row sm:items-start">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary-500/10">
-          <CheckCircle2 className="h-4 w-4 text-secondary-400" />
-        </div>
-        <div className="space-y-1">
-          <Text variant="small" className="font-medium text-slate-100 leading-snug">
-            {insightMessage}
-          </Text>
-          <Text variant="small" color="muted" className="leading-snug">
-            Total: <span className="font-semibold text-slate-200">{totalCompleted}/{totalPlanned}</span> tasks this week — best momentum on <span className="text-slate-100">{bestDay.day}</span>, improve <span className="text-slate-100">{worstDay.day}</span>.
-          </Text>
-        </div>
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-2 text-[11px] leading-tight text-slate-400">
-        <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-800/60 bg-slate-950/40 px-3 py-1">
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: chartColors.completed }} />
-          Completed
-        </div>
-        <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-800/60 bg-slate-950/40 px-3 py-1">
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: chartColors.planned }} />
-          Planned
+      {/* Insight + Legend row */}
+      <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-slate-800/60 bg-slate-950/60 px-3 py-2.5">
+        <Text variant="small" className="font-medium text-slate-100 leading-snug line-clamp-2">
+          {insightMessage}
+        </Text>
+        <div className="flex shrink-0 gap-3 text-[11px] text-slate-400">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: chartColors.completed }} />
+            Done
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: chartColors.planned }} />
+            Planned
+          </span>
         </div>
       </div>
     </Card>

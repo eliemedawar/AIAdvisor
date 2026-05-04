@@ -85,6 +85,7 @@ class ConversationMessagesView(APIView):
                 "messages": serializer.data,
                 "proposed_actions": proposed_actions,
                 "action_plan_confidence": payload.get("action_plan_confidence"),
+                "event_plan": payload.get("event_plan"),
             },
             status=status.HTTP_201_CREATED,
         )
@@ -134,6 +135,7 @@ class ConversationApplyActionsView(APIView):
                     "assignment_ids": exec_result.created_assignment_ids,
                     "event_ids": exec_result.created_event_ids,
                     "task_ids": exec_result.created_task_ids,
+                    "elective_ids": exec_result.updated_elective_ids,
                 },
             },
             status=status.HTTP_201_CREATED,

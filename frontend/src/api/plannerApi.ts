@@ -1,5 +1,7 @@
 import { httpClient } from "./httpClient";
 
+export type CourseStatus = "completed" | "in_progress" | "planned";
+
 export interface Course {
   id: number;
   user: number;
@@ -7,6 +9,11 @@ export interface Course {
   code: string;
   term: string;
   credits: number | null;
+  status: CourseStatus;
+  category: string;
+  major: string;
+  requirement_type: string;
+  original_placeholder: string;
 }
 
 export type AssignmentStatus = "pending" | "in_progress" | "done";
@@ -14,7 +21,7 @@ export type AssignmentStatus = "pending" | "in_progress" | "done";
 export interface Assignment {
   id: number;
   course: number;
-  course_name?: string; // Present when serialized with course (e.g. dashboard)
+  course_name?: string;
   title: string;
   description: string;
   due_at: string;
@@ -46,18 +53,79 @@ export interface CalendarEvent {
   type: string;
   course: number | null;
   assignment: number | null;
-  location?: string; // Optional location field for future backend support
+  location?: string;
 }
 
-/** Payloads for create/update (backend sets user where applicable) */
-export type CreateCoursePayload = Pick<Course, "name" | "code" | "term"> & { credits?: number | null };
+// ── Curriculum types ────────────────────────────────────────────────────────
+
+export interface CurriculaTerm {
+  term_number: number;
+  label: string;
+  season: string;
+  year: number;
+  term_credits: number;
+}
+
+export interface CurriculaInfo {
+  program: string;
+  total_credits: number | null;
+  terms: CurriculaTerm[];
+}
+
+export interface CurriculaResponse {
+  available_majors: string[];
+  curricula: Record<string, CurriculaInfo>;
+}
+
+/** A single option inside an elective list. */
+export interface ElectiveOption {
+  code: string;
+  name: string;
+  credits: number;
+}
+
+/** Response from GET /planner/courses/electives/ */
+export interface ElectiveListsResponse {
+  electives: Record<string, ElectiveOption[]>;
+}
+
+/** A course entry from the plan preview (not yet persisted). */
+export interface PlannedCourse {
+  code: string;
+  name: string;
+  credits: number;
+  term_num: number;
+  term_label: string;
+  category: string;
+  major: string;
+  status: CourseStatus;
+  is_placeholder: boolean;
+  is_duplicate: boolean;
+  /** Index within the term – used to key repeated placeholder codes. */
+  slot: number;
+  /** Requirement type key into ElectiveListsResponse.electives (empty for non-placeholders). */
+  requirement_type: string;
+  /** Filled in before apply-plan when user picks a real course for this slot. */
+  original_placeholder?: string;
+}
+
+// ── CRUD payloads ───────────────────────────────────────────────────────────
+
+export type CreateCoursePayload = Pick<Course, "name" | "code" | "term"> & {
+  credits?: number | null;
+  status?: CourseStatus;
+  category?: string;
+  major?: string;
+};
 export type UpdateCoursePayload = Partial<CreateCoursePayload>;
 
-export type CreateAssignmentPayload = Pick<Assignment, "title" | "description" | "due_at" | "status" | "type"> & {
-  course: number;
-  weight?: number | null;
+export type CreateAssignmentPayload = Pick<
+  Assignment,
+  "title" | "description" | "due_at" | "status" | "type"
+> & { course: number; weight?: number | null };
+export type UpdateAssignmentPayload = Partial<Omit<CreateAssignmentPayload, "course">> & {
+  course?: number;
 };
-export type UpdateAssignmentPayload = Partial<Omit<CreateAssignmentPayload, "course">> & { course?: number };
 
 export type CreateTaskPayload = Pick<Task, "title" | "description" | "status" | "priority"> & {
   assignment?: number | null;
@@ -65,11 +133,13 @@ export type CreateTaskPayload = Pick<Task, "title" | "description" | "status" | 
 };
 export type UpdateTaskPayload = Partial<CreateTaskPayload>;
 
-export type CreateEventPayload = Pick<CalendarEvent, "title" | "description" | "start_at" | "end_at" | "type"> & {
-  course?: number | null;
-  assignment?: number | null;
-};
+export type CreateEventPayload = Pick<
+  CalendarEvent,
+  "title" | "description" | "start_at" | "end_at" | "type"
+> & { course?: number | null; assignment?: number | null };
 export type UpdateEventPayload = Partial<CreateEventPayload>;
+
+// ── API client ───────────────────────────────────────────────────────────────
 
 export const plannerApi = {
   // Courses
@@ -93,11 +163,35 @@ export const plannerApi = {
     await httpClient.delete(`/planner/courses/${id}/`);
   },
 
+  // Smart onboarding
+  async getCurricula(): Promise<CurriculaResponse> {
+    const { data } = await httpClient.get<CurriculaResponse>("/planner/courses/curricula/");
+    return data;
+  },
+  async getElectives(): Promise<ElectiveListsResponse> {
+    const { data } = await httpClient.get<ElectiveListsResponse>("/planner/courses/electives/");
+    return data;
+  },
+  async generatePlan(
+    major: string,
+    currentTerm: number
+  ): Promise<{ courses: PlannedCourse[]; major: string }> {
+    const { data } = await httpClient.post("/planner/courses/generate-plan/", {
+      major,
+      current_term: currentTerm,
+    });
+    return data;
+  },
+  async applyPlan(
+    courses: PlannedCourse[]
+  ): Promise<{ created: Course[]; skipped: string[] }> {
+    const { data } = await httpClient.post("/planner/courses/apply-plan/", { courses });
+    return data;
+  },
+
   // Assignments
   async listAssignments(params?: Record<string, unknown>): Promise<Assignment[]> {
-    const { data } = await httpClient.get<Assignment[]>("/planner/assignments/", {
-      params
-    });
+    const { data } = await httpClient.get<Assignment[]>("/planner/assignments/", { params });
     return data;
   },
   async createAssignment(payload: CreateAssignmentPayload): Promise<Assignment> {
@@ -156,7 +250,5 @@ export const plannerApi = {
   },
   async deleteEvent(id: number): Promise<void> {
     await httpClient.delete(`/planner/events/${id}/`);
-  }
+  },
 };
-
-

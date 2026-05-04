@@ -3,7 +3,10 @@ import { Outlet, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Sidebar } from "../components/navigation/Sidebar";
 import { TopBar } from "../components/navigation/TopBar";
+import { GeneratePlanModal } from "../components/core/GeneratePlanModal";
 import { useBreakpoint } from "../hooks/useBreakpoint";
+import { useAuth } from "../hooks/useAuth";
+import { plannerApi } from "../api/plannerApi";
 import clsx from "clsx";
 
 const pageVariants = {
@@ -23,8 +26,23 @@ const pageTransition = {
  * Manages page transitions and responsive navigation
  */
 export const DashboardLayout = () => {
+  const { user } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
   const location = useLocation();
+
+  // Show the plan generator automatically for new users (0 courses, not yet dismissed).
+  useEffect(() => {
+    if (!user) return;
+    const key = `plan_onboarding_v1_${user.id}`;
+    if (localStorage.getItem(key)) return;
+
+    plannerApi.listCourses().then((courses) => {
+      if (courses.length === 0) {
+        setOnboardingOpen(true);
+      }
+    });
+  }, [user]);
   const viewport = useBreakpoint();
   const mobileSidebarRef = useRef<HTMLDivElement | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -182,13 +200,11 @@ export const DashboardLayout = () => {
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary-900/10 via-transparent to-transparent" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-accent-900/5 via-transparent to-transparent" />
 
-          {/* Content with AnimatePresence for smooth page transitions */}
-          <div
-            className={clsx(
-              "relative z-10 h-full min-h-0",
-              isChatRoute ? "flex flex-col overflow-hidden" : "overflow-y-auto"
-            )}
-          >
+          {/* Content with AnimatePresence for smooth page transitions.
+              The wrapper is always flex-col/overflow-hidden so its flex properties
+              never change mid-navigation — dynamic class changes on a mounted parent
+              cause reflows that break h-full resolution in child chat layouts. */}
+          <div className="relative z-10 flex h-full min-h-0 flex-col overflow-hidden">
             <AnimatePresence mode="wait">
               <motion.div
                 key={location.pathname}
@@ -197,7 +213,12 @@ export const DashboardLayout = () => {
                 exit="exit"
                 variants={pageVariants}
                 transition={pageTransition}
-                className={clsx(isChatRoute && "flex h-full min-h-0 flex-1 flex-col")}
+                className={clsx(
+                  "flex-1 min-h-0",
+                  isChatRoute
+                    ? "flex flex-col overflow-hidden"
+                    : "overflow-y-auto"
+                )}
               >
                 <Outlet />
               </motion.div>
@@ -205,6 +226,21 @@ export const DashboardLayout = () => {
           </div>
         </main>
       </div>
+
+      {/* Smart Onboarding Modal – shown once for new users */}
+      {user && (
+        <GeneratePlanModal
+          isOpen={onboardingOpen}
+          onClose={() => {
+            localStorage.setItem(`plan_onboarding_v1_${user.id}`, "1");
+            setOnboardingOpen(false);
+          }}
+          onPlanSaved={() => {
+            localStorage.setItem(`plan_onboarding_v1_${user.id}`, "1");
+            setOnboardingOpen(false);
+          }}
+        />
+      )}
 
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>

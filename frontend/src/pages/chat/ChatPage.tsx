@@ -1,6 +1,6 @@
 import { ChangeEvent, FormEvent, KeyboardEvent as ReactKeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
-import { Bot as BotIcon, User as UserIcon, AlertCircle, RotateCw, PanelRightOpen, Send as SendIcon, X, ChevronLeft, ChevronRight, Trash2, Paperclip } from "lucide-react";
+import { GraduationCap, User as UserIcon, AlertCircle, RotateCw, PanelRightOpen, Send as SendIcon, X, ChevronLeft, ChevronRight, Trash2, Paperclip } from "lucide-react";
 import {
   Heading,
   Text,
@@ -17,21 +17,415 @@ import {
 } from "../../components/chat";
 import { useAdvisorChat } from "../../hooks/useAdvisorChat";
 import { useBreakpoint } from "../../hooks/useBreakpoint";
+import type { EventPlan, ProposedAction } from "../../api/advisorApi";
+
+// ─── Rich message content renderer ──────────────────────────────────────────
+
+type MessageBlock =
+  | { kind: "paragraph"; text: string }
+  | { kind: "bullets"; items: string[] }
+  | { kind: "nextstep"; text: string }
+  | { kind: "header"; text: string }
+  | { kind: "spacer" };
+
+function parseMessageBlocks(content: string): MessageBlock[] {
+  const blocks: MessageBlock[] = [];
+  const lines = content.split("\n");
+  let currentBullets: string[] | null = null;
+
+  const flushBullets = () => {
+    if (currentBullets && currentBullets.length > 0) {
+      blocks.push({ kind: "bullets", items: [...currentBullets] });
+      currentBullets = null;
+    }
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Bullet lines: •, -, *, or numbered (1. 2. etc.)
+    if (/^([•\-\*]|\d+\.)\s+/.test(trimmed)) {
+      if (!currentBullets) currentBullets = [];
+      currentBullets.push(trimmed.replace(/^([•\-\*]|\d+\.)\s+/, ""));
+      continue;
+    }
+    flushBullets();
+    if (trimmed === "") {
+      if (blocks.length > 0 && blocks[blocks.length - 1].kind !== "spacer") {
+        blocks.push({ kind: "spacer" });
+      }
+      continue;
+    }
+    if (/^next step[s]?:/i.test(trimmed)) {
+      blocks.push({ kind: "nextstep", text: trimmed.replace(/^next step[s]?:\s*/i, "") });
+      continue;
+    }
+    // Section header: short line ending with ":" and no full-stop mid-text
+    if (trimmed.endsWith(":") && trimmed.length < 80 && !/[.!?]/.test(trimmed.slice(0, -1))) {
+      blocks.push({ kind: "header", text: trimmed.slice(0, -1) });
+      continue;
+    }
+    blocks.push({ kind: "paragraph", text: trimmed });
+  }
+  flushBullets();
+  while (blocks.length > 0 && blocks[blocks.length - 1].kind === "spacer") {
+    blocks.pop();
+  }
+  return blocks;
+}
+
+function InlineText({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  if (parts.length === 1) return <>{text}</>;
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.startsWith("**") && part.endsWith("**") ? (
+          <strong key={i} className="font-semibold text-slate-100">
+            {part.slice(2, -2)}
+          </strong>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
+
+function AssistantMessageContent({ content }: { content: string }) {
+  const blocks = parseMessageBlocks(content);
+  return (
+    <div className="space-y-2">
+      {blocks.map((block, i) => {
+        if (block.kind === "paragraph") {
+          return (
+            <p key={i} className="text-sm leading-[1.72]">
+              <InlineText text={block.text} />
+            </p>
+          );
+        }
+        if (block.kind === "bullets") {
+          return (
+            <ul key={i} className="space-y-1.5 pl-0.5">
+              {block.items.map((item, j) => (
+                <li key={j} className="flex items-start gap-2.5 text-sm leading-[1.65]">
+                  <span className="mt-[0.44em] h-1.5 w-1.5 shrink-0 rounded-full bg-violet-400/70" />
+                  <span className="flex-1">
+                    <InlineText text={item} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          );
+        }
+        if (block.kind === "nextstep") {
+          return (
+            <div
+              key={i}
+              className="mt-2 flex items-start gap-2.5 rounded-xl border border-violet-500/25 bg-violet-500/[0.08] px-3.5 py-2.5"
+            >
+              <span className="mt-0.5 shrink-0 rounded-md bg-violet-500/25 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-violet-300">
+                Next
+              </span>
+              <p className="flex-1 text-sm leading-[1.65] text-slate-200">
+                <InlineText text={block.text} />
+              </p>
+            </div>
+          );
+        }
+        if (block.kind === "header") {
+          return (
+            <p key={i} className="pb-0.5 pt-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 first:pt-0">
+              {block.text}
+            </p>
+          );
+        }
+        // spacer
+        return <div key={i} className="h-1" />;
+      })}
+    </div>
+  );
+}
+
+// ─── Event plan header ────────────────────────────────────────────────────────
+
+function EventPlanHeader({ plan }: { plan: EventPlan }) {
+  if (!plan.course_code && !plan.event_datetime) return null;
+  return (
+    <div className="mb-3 rounded-xl border border-violet-500/30 bg-violet-500/[0.07] px-3.5 py-2.5">
+      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-violet-400">
+        Detected event
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        {plan.course_code && (
+          <span className="font-bold text-slate-100">{plan.course_code}</span>
+        )}
+        {plan.event_type && (
+          <span className="rounded-md bg-violet-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-violet-300">
+            {plan.event_type}
+          </span>
+        )}
+        {plan.availability_note && (
+          <span className="text-xs text-slate-400">{plan.availability_note}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Action plan review component ────────────────────────────────────────────
+
+const PRIORITY_STYLES: Record<string, string> = {
+  high: "bg-red-500/20 text-red-300",
+  medium: "bg-amber-500/20 text-amber-300",
+  low: "bg-slate-600/30 text-slate-400",
+};
+
+const ASSIGNMENT_TYPE_STYLES: Record<string, string> = {
+  exam:     "bg-red-500/20 text-red-300",
+  quiz:     "bg-orange-500/20 text-orange-300",
+  project:  "bg-blue-500/20 text-blue-300",
+  homework: "bg-sky-500/20 text-sky-300",
+  other:    "bg-slate-600/30 text-slate-400",
+};
+
+const EVENT_TYPE_STYLES: Record<string, string> = {
+  exam:          "bg-red-500/20 text-red-300",
+  quiz:          "bg-orange-500/20 text-orange-300",
+  deadline:      "bg-amber-500/20 text-amber-300",
+  homework:      "bg-sky-500/20 text-sky-300",
+  project:       "bg-blue-500/20 text-blue-300",
+  study_session: "bg-emerald-500/20 text-emerald-300",
+  class:         "bg-slate-500/20 text-slate-300",
+  other:         "bg-slate-600/30 text-slate-400",
+};
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString([], {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function fmtTime(iso: string) {
+  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function fmtDateTime(iso: string) {
+  return new Date(iso).toLocaleString([], {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function computePriority(dueAt: string): "high" | "medium" | "low" {
+  const diffDays = (new Date(dueAt).getTime() - Date.now()) / 86_400_000;
+  if (diffDays < 3) return "high";
+  if (diffDays < 7) return "medium";
+  return "low";
+}
+
+function SectionHeader({ label, count }: { label: string; count: number }) {
+  return (
+    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">
+      {label} · {count}
+    </p>
+  );
+}
+
+function ActionPlanReview({
+  actions,
+  confidence,
+}: {
+  actions: ProposedAction[];
+  confidence?: number;
+}) {
+  const sessions = actions.filter((a) => a.type === "create_calendar_event");
+  const tasks = actions.filter((a) => a.type === "create_task");
+  const assignments = actions.filter((a) => a.type === "create_assignment");
+  const electives = actions.filter((a) => a.type === "select_elective");
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate-300">
+          Review the items below. Nothing is added until you confirm.
+        </p>
+        {confidence !== undefined && (
+          <span className="text-[10px] text-slate-500 tabular-nums">
+            {(confidence * 100).toFixed(0)}% confidence
+          </span>
+        )}
+      </div>
+
+      {actions.length === 0 && (
+        <p className="text-xs text-slate-400">No actions proposed.</p>
+      )}
+
+      {/* Calendar events (study sessions, deadlines, exams…) */}
+      {sessions.length > 0 && (
+        <div>
+          <SectionHeader label="Calendar events" count={sessions.length} />
+          <div className="space-y-2">
+            {actions.map((a, idx) =>
+              a.type !== "create_calendar_event" ? null : (
+                <div
+                  key={idx}
+                  className="rounded-xl border border-slate-700/50 bg-slate-900/60 px-3.5 py-2.5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-semibold text-slate-100">{a.title}</p>
+                    <span
+                      className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                        EVENT_TYPE_STYLES[a.event_type] ?? EVENT_TYPE_STYLES.other
+                      }`}
+                    >
+                      {a.event_type.replace("_", " ")}
+                    </span>
+                  </div>
+                  {a.course_code && (
+                    <p className="mt-0.5 text-[10px] text-slate-500">{a.course_code}</p>
+                  )}
+                  <p className="mt-1 text-xs text-slate-400">
+                    {fmtDate(a.start_at)} · {fmtTime(a.start_at)} – {fmtTime(a.end_at)}
+                  </p>
+                  {a.description && (
+                    <p className="mt-1 text-xs text-slate-500 line-clamp-2">{a.description}</p>
+                  )}
+                </div>
+              )
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Tasks */}
+      {tasks.length > 0 && (
+        <div>
+          <SectionHeader label="Tasks" count={tasks.length} />
+          <div className="space-y-2">
+            {actions.map((a, idx) =>
+              a.type !== "create_task" ? null : (
+                <div
+                  key={idx}
+                  className="rounded-xl border border-slate-800/70 bg-slate-950/50 px-3.5 py-2.5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-semibold text-slate-100">{a.title}</p>
+                    <span
+                      className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                        PRIORITY_STYLES[a.priority] ?? PRIORITY_STYLES.low
+                      }`}
+                    >
+                      {a.priority}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {a.course_code && `${a.course_code} · `}
+                    {a.due_at ? `Due: ${fmtDate(a.due_at)}` : "No due date"}
+                  </p>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Assignments / Deadlines */}
+      {assignments.length > 0 && (
+        <div>
+          <SectionHeader label="Assignments" count={assignments.length} />
+          <div className="space-y-2">
+            {actions.map((a, idx) =>
+              a.type !== "create_assignment" ? null : (
+                <div
+                  key={idx}
+                  className="rounded-xl border border-slate-800/70 bg-slate-950/50 px-3.5 py-2.5"
+                >
+                  <div className="flex items-start justify-between gap-1.5 mb-1">
+                    <p className="text-sm font-semibold text-slate-100">{a.title}</p>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <span
+                        className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                          ASSIGNMENT_TYPE_STYLES[a.assignment_type] ?? ASSIGNMENT_TYPE_STYLES.other
+                        }`}
+                      >
+                        {a.assignment_type}
+                      </span>
+                      {(() => {
+                        const p = computePriority(a.due_at);
+                        return (
+                          <span
+                            className={`rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${PRIORITY_STYLES[p]}`}
+                          >
+                            {p}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    {a.course_code && `${a.course_code} · `}Due: {fmtDateTime(a.due_at)}
+                  </p>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Elective selections */}
+      {electives.length > 0 && (
+        <div>
+          <SectionHeader label="Elective selections" count={electives.length} />
+          <div className="space-y-2">
+            {actions.map((a, idx) =>
+              a.type !== "select_elective" ? null : (
+                <div
+                  key={idx}
+                  className="rounded-xl border border-violet-600/40 bg-violet-500/10 px-3.5 py-2.5"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="rounded-md bg-violet-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-violet-300">
+                      Elective
+                    </span>
+                    <p className="text-sm font-semibold text-slate-100">
+                      {a.selected_course_code} — {a.selected_course_name}
+                    </p>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    {a.credits} credits · Replaces slot ID#{a.placeholder_course_id}
+                  </p>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export const ChatPage = () => {
-  const { 
-    conversation, 
-    messages, 
-    loading, 
-    sending, 
+  const {
+    conversation,
+    messages,
+    loading,
+    sending,
     applyingActions,
-    error, 
+    error,
     sendMessage,
     retryLastMessage,
     clearError,
     clearConversation,
     proposedActions,
     actionPlanConfidence,
+    eventPlan,
     applyProposedActions,
     clearProposedActions
   } = useAdvisorChat();
@@ -48,24 +442,22 @@ export const ChatPage = () => {
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
   const [isClearingConversation, setIsClearingConversation] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const prefersReducedMotion = useReducedMotion();
   const viewport = useBreakpoint();
   const showInlineContext = viewport.isDesktop;
 
-  // Auto-scroll to bottom when messages change, but only if the user is
-  // already near the bottom. This prevents "scrolling down" while the user
-  // is reading older messages.
+  // Scroll the sentinel element into view after every messages/sending change.
+  // requestAnimationFrame defers until after the browser has painted the new
+  // DOM so measurements and scrollIntoView are always accurate.
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-
-    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    const nearBottom = distanceFromBottom < 120; // px threshold
-
-    if (nearBottom) {
-      el.scrollTop = el.scrollHeight;
-    }
-  }, [messages, sending]);
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({
+        behavior: prefersReducedMotion ? "instant" : "smooth",
+        block: "end",
+      });
+    });
+  }, [messages, sending, prefersReducedMotion]);
 
   useEffect(() => {
     if (showInlineContext && isContextDrawerOpen) {
@@ -167,7 +559,7 @@ export const ChatPage = () => {
     <>
       <div className="flex h-full w-full flex-1 min-h-0 overflow-hidden">
         {/* Center Chat Column */}
-        <div className="relative flex flex-1 flex-col min-h-0">
+        <div className="relative flex flex-1 flex-col min-h-0 overflow-hidden">
           {showInlineContext && (
             <button
               type="button"
@@ -228,7 +620,7 @@ export const ChatPage = () => {
 
           <div
             ref={scrollRef}
-            className="scrollable flex flex-1 flex-col overflow-y-auto px-4 pb-32 pt-4 sm:px-6 sm:pb-36"
+            className="scrollable min-h-0 flex flex-1 flex-col overflow-y-auto px-4 pb-6 pt-4 sm:px-6"
           >
             {loading && !hasMessages ? (
               <div className="space-y-4">
@@ -237,8 +629,9 @@ export const ChatPage = () => {
                 <SkeletonChatMessage isUser={false} />
               </div>
             ) : hasMessages ? (
-              <div className="space-y-6">
-                <div className="space-y-2">
+              <>
+                <div className="flex-1 min-h-6" />
+                <div className="space-y-1">
                   {groupedMessages.map((group) => (
                     <div key={group.date}>
                       <DateSeparator date={group.date} />
@@ -257,7 +650,7 @@ export const ChatPage = () => {
                                 scale: prefersReducedMotion ? 1 : 0.98,
                               }}
                               transition={{ duration: 0.18, delay: index * 0.02, ease: [0.4, 0.1, 0.2, 1] }}
-                              className={`group mb-5 flex ${isUser ? "justify-end" : "justify-start"}`}
+                              className={`group mb-3 flex ${isUser ? "justify-end" : "justify-start"}`}
                             >
                               <div
                                 className={`flex w-full max-w-2xl items-end gap-3 sm:gap-4 ${
@@ -268,33 +661,43 @@ export const ChatPage = () => {
                                   className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-semibold transition-all duration-quick ease-snappy ${
                                     isUser
                                       ? "bg-gradient-to-br from-primary-500 to-accent-500 text-white shadow-elevation-mid"
-                                      : "border border-slate-800/70 bg-surface-elevated text-slate-200 shadow-elevation-low"
+                                      : "bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-elevation-mid"
                                   }`}
                                 >
                                   {isUser ? (
                                     <UserIcon className="h-4 w-4" />
                                   ) : (
-                                    <BotIcon className="h-4 w-4" />
+                                    <GraduationCap className="h-4 w-4" />
                                   )}
                                 </div>
 
                                 <div
-                                  className={`w-full max-w-xl rounded-2xl px-4 py-3 shadow-elevation-low transition-all duration-base ease-smooth ${
+                                  className={`w-full rounded-2xl shadow-elevation-low transition-all duration-base ease-smooth ${
                                     isUser
-                                      ? "bg-gradient-to-br from-primary-600 to-primary-500 text-slate-50 shadow-elevation-mid ring-1 ring-primary-500/20"
-                                      : "border border-slate-800/70 bg-surface-elevated text-slate-100 shadow-elevation-low ring-1 ring-slate-900/40"
+                                      ? "max-w-lg px-4 py-3 bg-gradient-to-br from-primary-600 to-primary-500 text-slate-50 shadow-elevation-mid ring-1 ring-primary-500/20"
+                                      : "max-w-[36rem] px-5 py-4 border border-slate-800/60 bg-surface-elevated text-slate-100 ring-1 ring-slate-900/40"
                                   }`}
                                 >
-                                  <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
-                                  <div
-                                    className={`mt-2 flex items-center gap-2 text-[11px] leading-tight ${
-                                      isUser ? "justify-end text-slate-200" : "justify-between text-slate-400"
-                                    }`}
-                                  >
-                                    {!isUser && <span className="font-medium text-slate-300">Advisor</span>}
-                                    {isUser && <span className="font-medium">You</span>}
-                                    <span className="opacity-90">{messageTime}</span>
-                                  </div>
+                                  {isUser ? (
+                                    <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+                                  ) : message.isLoading ? (
+                                    <div
+                                      className="flex items-center gap-1.5 py-0.5"
+                                      role="status"
+                                      aria-label="Advisor is thinking"
+                                    >
+                                      <span className="inline-flex h-2 w-2 animate-pulse-dots rounded-full bg-slate-400" />
+                                      <span className="inline-flex h-2 w-2 animate-pulse-dots rounded-full bg-slate-500 [animation-delay:0.2s]" />
+                                      <span className="inline-flex h-2 w-2 animate-pulse-dots rounded-full bg-slate-400 [animation-delay:0.4s]" />
+                                    </div>
+                                  ) : (
+                                    <AssistantMessageContent content={message.content} />
+                                  )}
+                                  {!message.isLoading && (
+                                    <div className={`mt-2.5 flex items-center text-[10px] leading-tight ${isUser ? "justify-end text-slate-200/70" : "justify-end text-slate-500"}`}>
+                                      <span>{messageTime}</span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </motion.div>
@@ -305,28 +708,7 @@ export const ChatPage = () => {
                   ))}
                 </div>
 
-                {sending && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.12, ease: [0.25, 1, 0.5, 1] }}
-                    className="flex justify-start"
-                    role="status"
-                    aria-live="polite"
-                    aria-label="AI is typing"
-                  >
-                    <div className="flex items-end gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-800/70 bg-surface-elevated shadow-elevation-low">
-                        <BotIcon className="h-4 w-4 text-slate-200" />
-                      </div>
-                      <div className="flex items-center gap-1.5 rounded-2xl border border-slate-800/70 bg-surface-elevated shadow-elevation-low ring-1 ring-slate-900/40 px-4 py-3">
-                        <span className="inline-flex h-2 w-2 animate-pulse-dots rounded-full bg-slate-400" />
-                        <span className="inline-flex h-2 w-2 animate-pulse-dots rounded-full bg-slate-500 [animation-delay:0.2s]" />
-                        <span className="inline-flex h-2 w-2 animate-pulse-dots rounded-full bg-slate-400 [animation-delay:0.4s]" />
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
+                {/* Typing indicator is now rendered inline as an optimistic assistant message bubble */}
 
                 {error && (
                   <motion.div
@@ -362,10 +744,12 @@ export const ChatPage = () => {
                     </Card>
                   </motion.div>
                 )}
-              </div>
+              </>
             ) : (
               <EmptyChatState onSelectPrompt={handleQuickAction} />
             )}
+            {/* Scroll sentinel – always rendered so scrollIntoView works in every state */}
+            <div ref={messagesEndRef} aria-hidden="true" />
           </div>
 
           <ChatInputArea
@@ -488,7 +872,7 @@ export const ChatPage = () => {
       <Modal
         isOpen={hasPendingActionPlan}
         onClose={clearProposedActions}
-        title="AI wants to update your planner"
+        title="AI suggests these changes"
         size="md"
         disableBackdropClose={applyingActions}
         footer={
@@ -521,74 +905,11 @@ export const ChatPage = () => {
           </>
         }
       >
-        <div className="space-y-3">
-          <p className="text-sm text-slate-300">
-            Review the items below. Nothing is added until you confirm.
-          </p>
-          {actionPlanConfidence !== undefined && (
-            <p className="text-xs text-slate-500">
-              AI confidence: {(actionPlanConfidence * 100).toFixed(0)}%
-            </p>
-          )}
-
-          {proposedActions.length === 0 ? (
-            <p className="text-xs text-slate-400">No actions proposed.</p>
-          ) : (
-            <div className="space-y-2">
-              {proposedActions.map((a, idx) => {
-                if (a.type === "create_assignment") {
-                  return (
-                    <div
-                      key={`${a.type}-${idx}`}
-                      className="rounded-xl border border-slate-800/70 bg-slate-950/50 px-3 py-2"
-                    >
-                      <p className="text-sm font-semibold text-slate-100">
-                        Assignment: {a.title}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        Course: {a.course_code} · Due:{" "}
-                        {new Date(a.due_at).toLocaleString()}
-                      </p>
-                    </div>
-                  );
-                }
-
-                if (a.type === "create_task") {
-                  return (
-                    <div
-                      key={`${a.type}-${idx}`}
-                      className="rounded-xl border border-slate-800/70 bg-slate-950/50 px-3 py-2"
-                    >
-                      <p className="text-sm font-semibold text-slate-100">
-                        Task: {a.title}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        Priority: {a.priority}
-                        {a.due_at && ` · Due: ${new Date(a.due_at).toLocaleString()}`}
-                        {a.course_code && ` · ${a.course_code}`}
-                      </p>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div
-                    key={`${a.type}-${idx}`}
-                    className="rounded-xl border border-slate-800/70 bg-slate-950/50 px-3 py-2"
-                  >
-                    <p className="text-sm font-semibold text-slate-100">
-                      Event: {a.title}
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      Starts: {new Date(a.start_at).toLocaleString()} · Ends:{" "}
-                      {new Date(a.end_at).toLocaleString()}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        {eventPlan && <EventPlanHeader plan={eventPlan} />}
+        <ActionPlanReview
+          actions={proposedActions}
+          confidence={actionPlanConfidence}
+        />
       </Modal>
 
       {/* Attach Context Modal */}
@@ -615,7 +936,12 @@ interface ChatInputAreaProps {
   onClearAttachedContext?: () => void;
 }
 
-const PROMPT_PRESETS = ["Plan week", "Today focus", "Exam prep", "Explain concept"];
+const PROMPT_PRESETS = [
+  "Make me a study plan",
+  "Plan my week",
+  "What do I still need?",
+  "Am I on track for CCE?",
+];
 const MAX_TEXTAREA_HEIGHT = 128;
 const LIVE_CONTEXT_VISIBILITY_KEY = "ai-advisor-live-context-visible";
 
@@ -666,8 +992,8 @@ const ChatInputArea = ({
   };
 
   return (
-    <div className="sticky bottom-0 left-0 right-0 px-6 pb-5 pt-3 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent backdrop-blur-sm">
-      <form onSubmit={handleFormSubmit} className="max-w-3xl mx-auto w-full space-y-2">
+    <div className="shrink-0 px-4 pt-3 sm:px-6 bg-gradient-to-t from-slate-950/95 via-slate-950/60 to-transparent backdrop-blur-sm" style={{ paddingBottom: 'max(1.25rem, calc(1.25rem + env(safe-area-inset-bottom)))' }}>
+      <form onSubmit={handleFormSubmit} className="max-w-3xl mx-auto w-full space-y-4">
         {showSuggestedPrompts && (
           <div className="flex flex-wrap items-center gap-2 text-[11px] font-medium">
             <span className="uppercase tracking-[0.16em] text-slate-400">Suggested prompts</span>
@@ -703,14 +1029,14 @@ const ChatInputArea = ({
           </div>
         )}
 
-        <div className="flex items-end gap-3 rounded-2xl bg-slate-950/80 border border-slate-800/80 px-4 py-3 backdrop-blur-md shadow-[0_18px_60px_rgba(0,0,0,0.65)]">
+        <div className="flex items-center gap-3 rounded-2xl bg-slate-950/80 border border-slate-800/80 px-4 py-2.5 backdrop-blur-md shadow-[0_18px_60px_rgba(0,0,0,0.65)] transition-[border-color,box-shadow] duration-150 focus-within:border-violet-500/60 focus-within:shadow-[0_18px_60px_rgba(0,0,0,0.65),0_0_0_2px_rgba(139,92,246,0.25)]">
           {/* Paperclip / attach context button */}
           <button
             type="button"
             onClick={onOpenAttach}
             disabled={isBusy}
             title="Attach context from planner"
-            className="mb-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:text-slate-200 disabled:opacity-40"
+            className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:text-slate-200 disabled:opacity-40"
             aria-label="Attach planner context"
           >
             <Paperclip className="h-4 w-4" />
@@ -722,13 +1048,13 @@ const ChatInputArea = ({
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             disabled={isBusy}
-            className="flex-1 resize-none bg-transparent border-none outline-none text-sm text-slate-50 placeholder:text-slate-500 max-h-32 overflow-y-auto disabled:opacity-60"
+            className="flex-1 resize-none bg-transparent border-none outline-none ring-0 focus:outline-none focus:ring-0 text-sm leading-6 text-slate-50 placeholder:text-slate-500 max-h-32 overflow-y-auto py-1 disabled:opacity-60"
             placeholder={placeholder}
           />
           <button
             type="submit"
             disabled={isSubmitDisabled}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow-lg transition hover:scale-[1.02] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow-lg transition hover:scale-[1.02] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
             aria-label="Send message"
           >
             <SendIcon className="h-4 w-4" />
@@ -751,7 +1077,7 @@ function EmptyChatState({ onSelectPrompt }: EmptyChatStateProps) {
       <div className="w-full max-w-[460px] rounded-3xl border border-slate-800/80 bg-slate-950/80 px-10 py-9 backdrop-blur-xl shadow-[0_24px_80px_rgba(0,0,0,0.65)]">
         <div className="flex items-center gap-3 mb-5">
           <div className="h-11 w-11 flex items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500">
-            <BotIcon className="h-5 w-5 text-white" />
+            <GraduationCap className="h-5 w-5 text-white" />
           </div>
           <div>
             <h2 className="text-lg font-semibold text-slate-50">Start your conversation</h2>
@@ -765,9 +1091,12 @@ function EmptyChatState({ onSelectPrompt }: EmptyChatStateProps) {
 
         <div className="flex flex-wrap gap-2">
           {[
-            "Review my week and tell me what to focus on.",
-            "Help me study for my next exam.",
-            "Suggest courses for next semester.",
+            "Make me a study plan",
+            "Plan my week around my deadlines",
+            "Help me study for my exams",
+            "What courses did I already complete?",
+            "Which electives can I choose?",
+            "Am I on track for CCE?",
           ].map((p) => (
             <button
               key={p}

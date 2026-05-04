@@ -1,8 +1,27 @@
 import { useState, useRef, useEffect, type RefObject } from "react";
 import { Link } from "react-router-dom";
-import { Menu, LogOut, GraduationCap, Bell, BellOff, AlertTriangle, Clock, Calendar } from "lucide-react";
+import {
+  Menu,
+  LogOut,
+  GraduationCap,
+  Bell,
+  BookOpen,
+  Clock,
+  CheckSquare,
+  TrendingUp,
+  AlertTriangle,
+  Sparkles,
+  Info,
+  CheckCheck,
+  Trash2,
+  Inbox,
+} from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
-import { useDeadlineReminders, type DeadlineItem, type DeadlineUrgency } from "../../hooks/useDeadlineReminders";
+import {
+  useNotifications,
+  type AppNotification,
+  type NotificationType,
+} from "../../hooks/useNotifications";
 import { Button } from "../core/Button";
 import { Avatar } from "../core/Avatar";
 import { Modal } from "../core/Modal";
@@ -13,53 +32,155 @@ interface TopBarProps {
   menuButtonRef?: RefObject<HTMLButtonElement>;
 }
 
-const urgencyConfig: Record<DeadlineUrgency, { label: string; color: string; dot: string }> = {
-  overdue:  { label: "Overdue",    color: "text-red-400",    dot: "bg-red-500" },
-  today:    { label: "Due today",  color: "text-orange-400", dot: "bg-orange-400" },
-  soon:     { label: "Due soon",   color: "text-yellow-400", dot: "bg-yellow-400" },
-  upcoming: { label: "Upcoming",   color: "text-blue-400",   dot: "bg-blue-400" },
+// ── Notification type config ──────────────────────────────────────────────────
+
+type TypeConfig = {
+  icon: React.ComponentType<{ className?: string }>;
+  bg: string;
+  iconCls: string;
+  label: string;
 };
 
-function DeadlineRow({ item }: { item: DeadlineItem }) {
-  const cfg = urgencyConfig[item.urgency];
+const TYPE_CONFIG: Record<NotificationType, TypeConfig> = {
+  deadline: {
+    icon: Clock,
+    bg: "bg-orange-500/15",
+    iconCls: "text-orange-400",
+    label: "Deadline",
+  },
+  task: {
+    icon: CheckSquare,
+    bg: "bg-blue-500/15",
+    iconCls: "text-blue-400",
+    label: "Task",
+  },
+  study: {
+    icon: BookOpen,
+    bg: "bg-teal-500/15",
+    iconCls: "text-teal-400",
+    label: "Study",
+  },
+  academic_warning: {
+    icon: TrendingUp,
+    bg: "bg-emerald-500/15",
+    iconCls: "text-emerald-400",
+    label: "Academic",
+  },
+  motivation: {
+    icon: Sparkles,
+    bg: "bg-violet-500/15",
+    iconCls: "text-violet-400",
+    label: "Tip",
+  },
+  system_reminder: {
+    icon: Info,
+    bg: "bg-slate-500/15",
+    iconCls: "text-slate-400",
+    label: "Reminder",
+  },
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatNotifTime(notif: AppNotification): string {
+  const now = new Date();
+
+  if (notif.type === "deadline") {
+    const diff = notif.time.getTime() - now.getTime();
+    if (diff < 0)
+      return `Overdue · ${notif.time.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+    if (diff < 86_400_000)
+      return `Due at ${notif.time.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
+    return `Due ${notif.time.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}`;
+  }
+
+  const ago = now.getTime() - notif.time.getTime();
+  if (ago < 60_000) return "Just now";
+  if (ago < 3_600_000) return `${Math.floor(ago / 60_000)}m ago`;
+  if (ago < 86_400_000) return `${Math.floor(ago / 3_600_000)}h ago`;
+  return notif.time.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+// ── Notification row ──────────────────────────────────────────────────────────
+
+function NotificationRow({
+  notif,
+  onRead,
+}: {
+  notif: AppNotification;
+  onRead: (id: string) => void;
+}) {
+  const cfg = TYPE_CONFIG[notif.type];
+  const Icon = cfg.icon;
+
+  // academic_warning can also be a "low GPA" alert — use AlertTriangle in that case
+  const EffectiveIcon =
+    notif.type === "academic_warning" && notif.id.includes("low")
+      ? AlertTriangle
+      : Icon;
+  const effectiveBg =
+    notif.type === "academic_warning" && notif.id.includes("low")
+      ? "bg-yellow-500/15"
+      : cfg.bg;
+  const effectiveIconCls =
+    notif.type === "academic_warning" && notif.id.includes("low")
+      ? "text-yellow-400"
+      : cfg.iconCls;
+
   return (
-    <div className="flex items-start gap-3 px-4 py-3 hover:bg-slate-800/40 transition-colors">
-      <span className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${cfg.dot}`} />
+    <button
+      type="button"
+      onClick={() => !notif.read && onRead(notif.id)}
+      className={`group w-full flex items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-800/50 ${
+        !notif.read ? "bg-slate-900/40" : ""
+      }`}
+    >
+      {/* Type icon */}
+      <div
+        className={`mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl ${effectiveBg}`}
+      >
+        <EffectiveIcon className={`h-4 w-4 ${effectiveIconCls}`} />
+      </div>
+
+      {/* Content */}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-slate-100">{item.title}</p>
-        <p className="text-xs text-slate-400">
-          {item.courseCode} · {item.dueAt.toLocaleDateString(undefined, {
-            weekday: "short", month: "short", day: "numeric",
-          })}{" "}
-          at{" "}
-          {item.dueAt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+        <div className="flex items-start justify-between gap-2">
+          <p
+            className={`text-sm leading-snug truncate ${
+              notif.read
+                ? "font-normal text-slate-300"
+                : "font-semibold text-slate-100"
+            }`}
+          >
+            {notif.title}
+          </p>
+          {!notif.read && (
+            <span className="mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-violet-400" />
+          )}
+        </div>
+        <p className="mt-0.5 text-xs text-slate-400 leading-snug line-clamp-2">
+          {notif.message}
+        </p>
+        <p className="mt-1.5 text-[10px] text-slate-500 tracking-wide">
+          {formatNotifTime(notif)}
         </p>
       </div>
-      <span className={`flex-shrink-0 text-[10px] font-semibold uppercase tracking-wide ${cfg.color}`}>
-        {cfg.label}
-      </span>
-    </div>
+    </button>
   );
 }
 
-/**
- * TopBar - Header navigation with user actions and deadline bell
- */
+// ── TopBar ────────────────────────────────────────────────────────────────────
+
 export const TopBar = ({ onToggleSidebar, isSidebarOpen, menuButtonRef }: TopBarProps) => {
   const { user, logout } = useAuth();
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
   const bellRef = useRef<HTMLDivElement>(null);
 
-  const {
-    deadlines,
-    unreadCount,
-    markAllRead,
-    notificationPermission,
-    requestPermission,
-  } = useDeadlineReminders();
+  const { notifications, unreadCount, markAllRead, markRead, clearAll } =
+    useNotifications();
 
-  // Close bell dropdown when clicking outside
+  // Close panel when clicking outside
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (bellRef.current && !bellRef.current.contains(e.target as Node)) {
@@ -70,9 +191,25 @@ export const TopBar = ({ onToggleSidebar, isSidebarOpen, menuButtonRef }: TopBar
     return () => document.removeEventListener("mousedown", handler);
   }, [bellOpen]);
 
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setBellOpen(false);
+    };
+    if (bellOpen) document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [bellOpen]);
+
   const handleOpenBell = () => {
     setBellOpen((v) => !v);
-    if (!bellOpen) markAllRead();
+  };
+
+  const handleMarkAllRead = () => {
+    markAllRead();
+  };
+
+  const handleClearAll = () => {
+    clearAll();
   };
 
   const handleOpenLogoutConfirm = () => setIsLogoutConfirmOpen(true);
@@ -90,10 +227,9 @@ export const TopBar = ({ onToggleSidebar, isSidebarOpen, menuButtonRef }: TopBar
     user?.email?.[0]?.toUpperCase() ||
     "U";
 
-  const overdueCount = deadlines.filter((d) => d.urgency === "overdue").length;
-
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-800/50 bg-surface-base px-4 shadow-elevation-mid backdrop-blur-xl lg:px-8">
+      {/* Left: hamburger + logo */}
       <div className="flex items-center gap-3">
         {onToggleSidebar && (
           <button
@@ -118,6 +254,7 @@ export const TopBar = ({ onToggleSidebar, isSidebarOpen, menuButtonRef }: TopBar
         </div>
       </div>
 
+      {/* Right: welcome + bell + profile + logout */}
       <div className="flex flex-1 items-center justify-end gap-3">
         <div className="hidden text-sm text-slate-300 md:block">
           <span className="text-slate-500">Welcome back, </span>
@@ -126,102 +263,97 @@ export const TopBar = ({ onToggleSidebar, isSidebarOpen, menuButtonRef }: TopBar
           </span>
         </div>
 
-        {/* Deadline Bell */}
+        {/* ── Notifications Bell ─────────────────────────────────────────── */}
         <div ref={bellRef} className="relative">
           <button
             type="button"
             onClick={handleOpenBell}
+            aria-label="Open notifications"
+            aria-expanded={bellOpen}
             className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700/60 bg-surface-base shadow-elevation-low text-slate-300 transition-all duration-quick ease-snappy hover:bg-surface-elevated hover:border-slate-600/80 hover:text-slate-100 focus-visible:outline-none"
-            aria-label="Deadline reminders"
           >
             <Bell className="h-5 w-5" aria-hidden="true" />
             {unreadCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-violet-500 text-[10px] font-bold text-white shadow-sm">
                 {unreadCount > 9 ? "9+" : unreadCount}
               </span>
             )}
           </button>
 
-          {/* Dropdown */}
+          {/* ── Notifications Panel ──────────────────────────────────────── */}
           {bellOpen && (
-            <div className="absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-2xl border border-slate-800/70 bg-slate-950/95 shadow-[0_20px_60px_rgba(2,6,23,0.9)] backdrop-blur-2xl">
-              {/* Header */}
-              <div className="flex items-center justify-between border-b border-slate-800/60 px-4 py-3">
+            <div className="absolute right-0 top-12 z-50 flex w-[340px] max-h-[520px] flex-col rounded-2xl border border-slate-800/70 bg-slate-950/95 shadow-[0_24px_64px_rgba(2,6,23,0.92)] backdrop-blur-2xl">
+              {/* Panel header — stays fixed at top */}
+              <div className="flex shrink-0 items-center justify-between border-b border-slate-800/60 px-4 py-3">
                 <div className="flex items-center gap-2">
                   <Bell className="h-4 w-4 text-slate-400" />
-                  <span className="text-sm font-semibold text-slate-100">Upcoming Deadlines</span>
-                  {deadlines.length > 0 && (
-                    <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-medium text-slate-400">
-                      {deadlines.length}
+                  <span className="text-sm font-semibold text-slate-100">
+                    Notifications
+                  </span>
+                  {unreadCount > 0 && (
+                    <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] font-semibold text-violet-300">
+                      {unreadCount} new
                     </span>
                   )}
                 </div>
 
-                {/* Notification permission toggle */}
-                {notificationPermission !== "unsupported" && (
-                  notificationPermission === "denied" ? (
-                    <span
-                      title="Notifications are blocked in your browser settings. To enable, update your browser's site permissions."
-                      className="flex cursor-default items-center gap-1 rounded-lg border border-slate-700/40 bg-slate-800/40 px-2 py-1 text-[10px] font-medium text-slate-500"
-                    >
-                      <BellOff className="h-3 w-3" /> Blocked
-                    </span>
-                  ) : (
+                <div className="flex items-center gap-0.5">
+                  {unreadCount > 0 && (
                     <button
-                      onClick={requestPermission}
-                      title={
-                        notificationPermission === "granted"
-                          ? "Browser notifications enabled"
-                          : "Enable browser notifications"
-                      }
-                      className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium transition-colors ${
-                        notificationPermission === "granted"
-                          ? "text-emerald-400 bg-emerald-900/20 border border-emerald-800/40"
-                          : "text-slate-400 bg-slate-800/40 border border-slate-700/40 hover:text-slate-200"
-                      }`}
+                      type="button"
+                      onClick={handleMarkAllRead}
+                      title="Mark all as read"
+                      className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-slate-400 transition-colors hover:bg-slate-800/60 hover:text-slate-200"
                     >
-                      {notificationPermission === "granted" ? (
-                        <><Bell className="h-3 w-3" /> On</>
-                      ) : (
-                        <><BellOff className="h-3 w-3" /> Enable alerts</>
-                      )}
+                      <CheckCheck className="h-3 w-3" />
+                      Mark read
                     </button>
-                  )
-                )}
+                  )}
+                  {notifications.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearAll}
+                      title="Clear all notifications"
+                      className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-medium text-slate-500 transition-colors hover:bg-slate-800/60 hover:text-slate-300"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Clear
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {/* Deadline list */}
-              <div className="max-h-80 overflow-y-auto">
-                {deadlines.length === 0 ? (
-                  <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
-                    <Calendar className="h-8 w-8 text-slate-600" />
-                    <p className="text-sm font-medium text-slate-400">All caught up!</p>
-                    <p className="text-xs text-slate-500">No deadlines in the next 7 days.</p>
+              {/* Notification list — scrolls independently */}
+              <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-slate-800/40">
+                {notifications.length === 0 ? (
+                  <div className="flex flex-col items-center gap-2.5 px-4 py-10 text-center">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-800/50">
+                      <Inbox className="h-6 w-6 text-slate-500" />
+                    </div>
+                    <p className="text-sm font-medium text-slate-400">
+                      All clear!
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      No notifications right now. Check back later.
+                    </p>
                   </div>
                 ) : (
-                  <>
-                    {overdueCount > 0 && (
-                      <div className="flex items-center gap-2 bg-red-950/30 px-4 py-2">
-                        <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
-                        <p className="text-xs font-medium text-red-400">
-                          {overdueCount} overdue assignment{overdueCount > 1 ? "s" : ""}
-                        </p>
-                      </div>
-                    )}
-                    <div className="divide-y divide-slate-800/50">
-                      {deadlines.map((item) => (
-                        <DeadlineRow key={item.id} item={item} />
-                      ))}
-                    </div>
-                  </>
+                  notifications.map((notif) => (
+                    <NotificationRow
+                      key={notif.id}
+                      notif={notif}
+                      onRead={markRead}
+                    />
+                  ))
                 )}
               </div>
 
-              {/* Footer */}
-              {deadlines.length > 0 && (
-                <div className="border-t border-slate-800/60 px-4 py-2.5 flex items-center gap-1.5 text-xs text-slate-500">
-                  <Clock className="h-3 w-3" />
-                  <span>Updates every 5 minutes</span>
+              {/* Panel footer — stays fixed at bottom */}
+              {notifications.length > 0 && (
+                <div className="flex shrink-0 items-center gap-1.5 border-t border-slate-800/60 px-4 py-2">
+                  <span className="text-[10px] text-slate-600">
+                    {notifications.length} notification{notifications.length !== 1 ? "s" : ""} · updates every 5 min
+                  </span>
                 </div>
               )}
             </div>
@@ -259,6 +391,7 @@ export const TopBar = ({ onToggleSidebar, isSidebarOpen, menuButtonRef }: TopBar
         </button>
       </div>
 
+      {/* Logout confirmation modal */}
       <Modal
         isOpen={isLogoutConfirmOpen}
         onClose={handleCloseLogoutConfirm}

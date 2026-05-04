@@ -6,17 +6,22 @@ from .models import Assignment, CalendarEvent, Course, Task
 
 
 class CourseSerializer(serializers.ModelSerializer):
-  class Meta:
-      model = Course
-      fields = (
-          "id",
-          "user",
-          "name",
-          "code",
-          "term",
-          "credits",
-      )
-      read_only_fields = ("id", "user")
+    class Meta:
+        model = Course
+        fields = (
+            "id",
+            "user",
+            "name",
+            "code",
+            "term",
+            "credits",
+            "status",
+            "category",
+            "major",
+            "requirement_type",
+            "original_placeholder",
+        )
+        read_only_fields = ("id", "user")
 
 
 class AssignmentSerializer(serializers.ModelSerializer):

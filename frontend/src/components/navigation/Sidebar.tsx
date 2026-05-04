@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   MessageCircle,
   CalendarDays,
-  User,
   GraduationCap,
   ChevronsLeft,
   ChevronsRight,
@@ -18,7 +17,6 @@ const navItems = [
   { to: "/chat", label: "AI Advisor", icon: <MessageCircle className="h-5 w-5" /> },
   { to: "/calendar", label: "Calendar", icon: <CalendarDays className="h-5 w-5" /> },
   { to: "/planner", label: "Planner", icon: <ListTodo className="h-5 w-5" /> },
-  { to: "/profile", label: "Profile", icon: <User className="h-5 w-5" /> }
 ];
 
 const SIDEBAR_WIDTHS = {

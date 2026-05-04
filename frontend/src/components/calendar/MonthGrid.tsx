@@ -22,6 +22,7 @@ interface MonthGridProps {
   eventsByDate: Map<string, CalendarEvent[]>;
   onDayClick: (dateKey: string) => void;
   onAddEvent: (dateKey: string) => void;
+  onEventClick?: (event: CalendarEvent) => void;
 }
 
 const dayHeaders = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -31,6 +32,7 @@ export const MonthGrid = ({
   eventsByDate,
   onDayClick,
   onAddEvent,
+  onEventClick,
 }: MonthGridProps) => {
   const [hoverState, setHoverState] = useState<{
     dateKey: string | null;
@@ -61,11 +63,11 @@ export const MonthGrid = ({
   return (
     <div>
       {/* Day headers */}
-      <div className="mb-3 grid grid-cols-7 gap-2">
+      <div className="mb-2 grid grid-cols-7 gap-1.5">
         {dayHeaders.map((day) => (
           <div
             key={day}
-            className="py-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-400"
+            className="py-1.5 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500"
           >
             {day}
           </div>
@@ -73,7 +75,7 @@ export const MonthGrid = ({
       </div>
 
       {/* Calendar grid */}
-      <div className="grid grid-cols-7 gap-2">
+      <div className="grid grid-cols-7 gap-1.5">
         {weeks.map((week, weekIndex) =>
           week.map((day, dayIndex) => {
             const events = eventsByDate.get(day.dateKey) ?? [];
@@ -91,7 +93,7 @@ export const MonthGrid = ({
                 onMouseEnter={(e) => events.length > 0 && handleDayHover(day.dateKey, events, e)}
                 onMouseLeave={handleDayHoverEnd}
                 className={clsx(
-                  "group relative flex min-h-[96px] flex-col rounded-xl border px-3 py-2.5 text-left shadow-elevation-flat transition-all duration-quick ease-snappy hover:-translate-y-0.5 hover:shadow-elevation-low",
+                  "group relative flex min-h-[70px] flex-col rounded-xl border px-2.5 py-2 text-left shadow-elevation-flat transition-all duration-quick ease-snappy hover:-translate-y-0.5 hover:shadow-elevation-low",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950",
                   // Today styling
                   day.isToday &&
@@ -146,7 +148,13 @@ export const MonthGrid = ({
                 <div className="flex-1 space-y-1.5">
                   {events.length > 0 ? (
                     visibleEvents.map((event, i) => (
-                      <EventIndicator key={event.id} event={event} compact delay={i * 0.05} />
+                      <div
+                        key={event.id}
+                        onClick={(e) => { e.stopPropagation(); onEventClick?.(event); }}
+                        className={onEventClick ? "cursor-pointer" : undefined}
+                      >
+                        <EventIndicator event={event} compact delay={i * 0.05} />
+                      </div>
                     ))
                   ) : !day.isPast ? (
                     // Empty day affordance

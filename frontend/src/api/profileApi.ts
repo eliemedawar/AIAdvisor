@@ -5,6 +5,7 @@ export interface StudentProfile {
   user: number;
   major: string;
   year: string;
+  current_semester: number | null;
   current_gpa: number | null;
   target_gpa: number | null;
   goals: string;
@@ -15,7 +16,14 @@ export interface StudentProfile {
 export type UpdateProfilePayload = Partial<
   Pick<
     StudentProfile,
-    "major" | "year" | "current_gpa" | "target_gpa" | "goals" | "time_zone" | "study_style"
+    | "major"
+    | "year"
+    | "current_semester"
+    | "current_gpa"
+    | "target_gpa"
+    | "goals"
+    | "time_zone"
+    | "study_style"
   >
 >;
 
@@ -28,7 +36,5 @@ export const profileApi = {
   async updateProfile(payload: UpdateProfilePayload): Promise<StudentProfile> {
     const { data } = await httpClient.patch<StudentProfile>("/profile/", payload);
     return data;
-  }
+  },
 };
-
-

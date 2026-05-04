@@ -15,6 +15,7 @@ interface DayDetailsPanelProps {
   events: CalendarEvent[];
   onAddEvent?: () => void;
   onComplete?: (event: CalendarEvent) => Promise<void>;
+  onEventClick?: (event: CalendarEvent) => void;
 }
 
 /**
@@ -28,6 +29,7 @@ export const DayDetailsPanel = ({
   events,
   onAddEvent,
   onComplete,
+  onEventClick,
 }: DayDetailsPanelProps) => {
   const [completingIds, setCompletingIds] = useState<Set<number>>(new Set());
   const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
@@ -112,14 +114,18 @@ export const DayDetailsPanel = ({
               {sortedEvents.length > 0 ? (
                 <div className="space-y-3">
                   {sortedEvents.map((event, idx) => (
-                    <div key={event.id} className="group rounded-2xl border border-slate-900/60 bg-slate-950/40 p-3 shadow-elevation-flat transition-colors hover:border-slate-800/70">
+                    <div
+                      key={event.id}
+                      onClick={() => onEventClick?.(event)}
+                      className={`group rounded-2xl border border-slate-900/60 bg-slate-950/40 p-3 shadow-elevation-flat transition-colors hover:border-slate-800/70 ${onEventClick ? "cursor-pointer" : ""}`}
+                    >
                       <EventIndicator event={event} showTime showLocation delay={idx * 0.04} />
 
                       {/* Quick Actions */}
                       <div className="mt-3 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
                         {onComplete && (
                           <button
-                            onClick={() => handleComplete(event)}
+                            onClick={(e) => { e.stopPropagation(); void handleComplete(event); }}
                             disabled={completingIds.has(event.id) || completedIds.has(event.id)}
                             className={`flex flex-1 items-center justify-center gap-1 rounded-xl border px-3 py-1.5 text-xs transition-smooth
                               ${completedIds.has(event.id)
@@ -138,6 +144,14 @@ export const DayDetailsPanel = ({
                                 ? "Saving…"
                                 : "Complete"}
                             </span>
+                          </button>
+                        )}
+                        {onEventClick && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onEventClick(event); }}
+                            className="flex items-center gap-1 rounded-xl border border-slate-900/60 px-3 py-1.5 text-xs text-slate-400 transition-smooth hover:border-slate-800 hover:text-slate-100"
+                          >
+                            Edit / Details
                           </button>
                         )}
                       </div>
@@ -164,7 +178,7 @@ export const DayDetailsPanel = ({
             {sortedEvents.length > 0 && (
               <div className="border-t border-slate-900/60 bg-slate-950/80 p-4">
                 <p className="text-xs text-slate-500">
-                  Click an event to view full details and related assignments.
+                  Click an event to view details, edit, or delete it.
                 </p>
               </div>
             )}

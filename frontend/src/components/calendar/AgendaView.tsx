@@ -10,12 +10,13 @@ import { parseISO, isAfter, startOfDay } from "date-fns";
 interface AgendaViewProps {
   events: CalendarEvent[];
   onAddEvent?: () => void;
+  onEventClick?: (event: CalendarEvent) => void;
 }
 
 /**
  * AgendaView - Scrollable list grouped by date (mobile-optimized)
  */
-export const AgendaView = ({ events, onAddEvent }: AgendaViewProps) => {
+export const AgendaView = ({ events, onAddEvent, onEventClick }: AgendaViewProps) => {
   // Filter future events and today
   const now = startOfDay(new Date());
   const upcomingEvents = events.filter((event) => {
@@ -81,13 +82,18 @@ export const AgendaView = ({ events, onAddEvent }: AgendaViewProps) => {
             {/* Events for this date */}
             <div className="mt-3 space-y-2">
               {dateEvents.map((event, eventIdx) => (
-                <EventIndicator
+                <div
                   key={event.id}
-                  event={event}
-                  showTime
-                  showLocation
-                  delay={eventIdx * 0.03}
-                />
+                  onClick={() => onEventClick?.(event)}
+                  className={onEventClick ? "cursor-pointer transition-opacity hover:opacity-80" : undefined}
+                >
+                  <EventIndicator
+                    event={event}
+                    showTime
+                    showLocation
+                    delay={eventIdx * 0.03}
+                  />
+                </div>
               ))}
             </div>
           </motion.div>

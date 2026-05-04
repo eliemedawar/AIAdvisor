@@ -11,16 +11,21 @@ export interface Conversation {
 export type MessageRole = "user" | "assistant";
 
 export interface Message {
-  id: number;
+  /** Numeric ID from the server, or a temporary string ID for optimistic messages. */
+  id: number | string;
   conversation: number;
   role: MessageRole;
   content: string;
   created_at: string;
+  /** Set to `true` on locally-generated messages that haven't been confirmed by the server yet. */
+  optimistic?: true;
+  /** Set to `true` on the temporary assistant placeholder shown while the API is in flight. */
+  isLoading?: true;
 }
 
 export type AssignmentType = "homework" | "project" | "exam" | "quiz" | "other";
 export type AssignmentStatus = "pending" | "in_progress" | "done";
-export type EventType = "exam" | "class" | "study_session" | "other";
+export type EventType = "exam" | "class" | "study_session" | "deadline" | "quiz" | "homework" | "project" | "other";
 export type TaskPriority = "low" | "medium" | "high";
 
 export type ProposedAction =
@@ -51,12 +56,42 @@ export type ProposedAction =
       priority: TaskPriority;
       status: AssignmentStatus;
       course_code: string | null;
+    }
+  | {
+      type: "select_elective";
+      placeholder_course_id: number;
+      selected_course_code: string;
+      selected_course_name: string;
+      credits: number;
     };
+
+export interface EventPlanStudySession {
+  title: string;
+  start_at: string;
+  end_at: string;
+  description: string | null;
+}
+
+export interface EventPlanTask {
+  title: string;
+  due_at: string | null;
+  priority: TaskPriority;
+}
+
+export interface EventPlan {
+  course_code: string | null;
+  event_type: string | null;
+  event_datetime: string | null;
+  availability_note: string | null;
+  study_sessions: EventPlanStudySession[];
+  tasks: EventPlanTask[];
+}
 
 export interface SendMessageResponse {
   messages: Message[];
   proposed_actions: ProposedAction[];
   action_plan_confidence?: number;
+  event_plan?: EventPlan | null;
 }
 
 export interface ApplyActionsResponse {
@@ -65,6 +100,7 @@ export interface ApplyActionsResponse {
     assignment_ids: number[];
     event_ids: number[];
     task_ids: number[];
+    elective_ids: number[];
   };
 }
 

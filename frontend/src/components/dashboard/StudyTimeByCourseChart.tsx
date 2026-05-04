@@ -42,14 +42,15 @@ export const StudyTimeByCourseChart = ({ data, className }: StudyTimeByCourseCha
       <Card variant="elevated" padding="md" className={className}>
         <SectionHeader
           title="Study Time by Course"
-          subtitle="Track where your study time goes"
+          subtitle="This week's breakdown"
           small
         />
-        <div className="mt-4">
+        <div className="mt-3">
           <EmptyState
+            compact
             icon={<BookOpen className="h-8 w-8" />}
             title="No study time tracked"
-            description="Log your study sessions to see time distribution across courses."
+            description="Log study sessions to see time distribution by course."
             action={<Button size="sm" variant="primary">Log Study Time</Button>}
           />
         </div>
@@ -93,8 +94,8 @@ export const StudyTimeByCourseChart = ({ data, className }: StudyTimeByCourseCha
         small
       />
       
-      <div className="mt-5">
-        <ResponsiveContainer width="100%" height={260}>
+      <div className="mt-4">
+        <ResponsiveContainer width="100%" height={Math.max(120, sortedData.length * 34)}>
           <BarChart
             data={sortedData}
             layout="vertical"
@@ -146,48 +147,27 @@ export const StudyTimeByCourseChart = ({ data, className }: StudyTimeByCourseCha
         </ResponsiveContainer>
       </div>
 
-      {/* Insight Text and At-Risk Courses */}
-      <div className="mt-4 space-y-3">
-        <div className="flex items-start gap-3 rounded-xl border border-slate-800/60 bg-slate-950/60 p-4 shadow-elevation-flat backdrop-blur-sm">
-          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${atRiskCourses.length > 0 ? 'bg-warning-500/10' : 'bg-primary-500/10'}`}>
-            {atRiskCourses.length > 0 ? (
-              <AlertCircle className="h-4 w-4 text-warning-400" />
-            ) : (
-              <BookOpen className="h-4 w-4 text-primary-400" />
-            )}
-          </div>
-          <div className="flex-1">
-            <Text variant="small" className="text-slate-100 font-medium leading-snug">
-              {insightMessage}
-            </Text>
-            <Text variant="small" color="muted" className="mt-1 leading-snug">
-              Total study time: <span className="font-semibold text-slate-200">{totalHours}h</span> this week
-            </Text>
-          </div>
+      {/* Insight row */}
+      <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-slate-800/60 bg-slate-950/60 px-3 py-2.5">
+        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${atRiskCourses.length > 0 ? 'bg-warning-500/10' : 'bg-primary-500/10'}`}>
+          {atRiskCourses.length > 0 ? (
+            <AlertCircle className="h-4 w-4 text-warning-400" />
+          ) : (
+            <BookOpen className="h-4 w-4 text-primary-400" />
+          )}
+        </span>
+        <div className="min-w-0 flex-1">
+          <Text variant="small" className="text-slate-100 font-medium leading-snug line-clamp-2">
+            {insightMessage}
+          </Text>
+          <Text variant="small" color="muted" className="leading-snug">
+            Total: <span className="font-semibold text-slate-200">{totalHours}h</span> this week
+          </Text>
         </div>
-
-        {/* At-Risk Courses List */}
         {atRiskCourses.length > 0 && (
-          <div className="rounded-xl border border-warning-500/30 bg-warning-500/5 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertCircle className="h-4 w-4 text-warning-400" />
-              <Text variant="small" className="text-warning-400 font-semibold">
-                Courses needing attention
-              </Text>
-            </div>
-            <div className="space-y-2">
-              {atRiskCourses.map((course, idx) => (
-                <div key={idx} className="flex items-center justify-between">
-                  <Text variant="small" className="text-slate-200">
-                    {course.courseName}
-                  </Text>
-                  <Badge variant="warning" size="sm">
-                    {course.hours}h
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </div>
+          <Badge variant="warning" size="sm" className="shrink-0">
+            {atRiskCourses.length} at risk
+          </Badge>
         )}
       </div>
     </Card>

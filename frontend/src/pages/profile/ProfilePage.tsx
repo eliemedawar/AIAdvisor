@@ -4,7 +4,8 @@ import {
   GraduationCap,
   TrendingUp,
   BookOpen,
-  AlertCircle
+  AlertCircle,
+  Sparkles,
 } from "lucide-react";
 import {
   PageShell,
@@ -16,23 +17,25 @@ import {
   StatCard,
   Avatar,
   Input,
+  Select,
   Button,
   SkeletonCard,
 } from "../../components";
+import { GeneratePlanModal } from "../../components/core/GeneratePlanModal";
 import { useAuth } from "../../hooks/useAuth";
 import { useProfile } from "../../hooks/useProfile";
 import { useToast } from "../../context/ToastContext";
+import { plannerApi, CurriculaInfo } from "../../api/plannerApi";
+
+const FIXED_MAJORS = ["CCE", "CSE", "ECE"] as const;
 
 const fadeInUp = {
   initial: { opacity: 0, y: 20 },
-  animate: { 
-    opacity: 1, 
+  animate: {
+    opacity: 1,
     y: 0,
-    transition: {
-      duration: 0.24,
-      ease: [0.4, 0, 0.2, 1]
-    }
-  }
+    transition: { duration: 0.24, ease: [0.4, 0, 0.2, 1] },
+  },
 };
 
 export const ProfilePage = () => {
@@ -41,34 +44,66 @@ export const ProfilePage = () => {
   const { showSuccess, showError } = useToast();
 
   const [major, setMajor] = useState("");
-  const [year, setYear] = useState("");
+  const [currentTerm, setCurrentTerm] = useState<string>("");
+  const [currentGpa, setCurrentGpa] = useState<string>("");
   const [targetGpa, setTargetGpa] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [planModalOpen, setPlanModalOpen] = useState(false);
+
+  // Curriculum data for the term select
+  const [curricula, setCurricula] = useState<Record<string, CurriculaInfo>>({});
+  const [availableMajors, setAvailableMajors] = useState<string[]>([]);
+
+  useEffect(() => {
+    plannerApi.getCurricula().then((r) => {
+      setAvailableMajors(r.available_majors);
+      setCurricula(r.curricula);
+    });
+  }, []);
 
   useEffect(() => {
     if (profile) {
       setMajor(profile.major ?? "");
-      setYear(profile.year ?? "");
-      setTargetGpa(
-        profile.target_gpa != null ? profile.target_gpa.toString() : ""
+      setCurrentTerm(
+        profile.current_semester != null ? String(profile.current_semester) : ""
       );
+      setCurrentGpa(profile.current_gpa != null ? String(Number(profile.current_gpa)) : "");
+      setTargetGpa(profile.target_gpa != null ? String(Number(profile.target_gpa)) : "");
     }
   }, [profile]);
+
+  // Reset term when major changes and the current term is no longer valid
+  const handleMajorChange = (newMajor: string) => {
+    setMajor(newMajor);
+    const terms = curricula[newMajor]?.terms ?? [];
+    const valid = terms.some((t) => String(t.term_number) === currentTerm);
+    if (!valid) setCurrentTerm("");
+  };
+
+  const termOptions = curricula[major]?.terms ?? [];
+  const hasCurriculum = availableMajors.includes(major);
+  const canGeneratePlan = hasCurriculum && currentTerm !== "";
+
+  // Derive year label from term for the StatCard
+  const termObj = termOptions.find((t) => String(t.term_number) === currentTerm);
+  const yearDisplay = termObj ? `Year ${termObj.year}` : profile?.year || "Not set";
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSaving(true);
 
-    const parsedTarget =
-      targetGpa.trim() === "" ? null : Number.parseFloat(targetGpa);
+    const parsedTarget = targetGpa.trim() === "" ? null : Number.parseFloat(targetGpa);
+    const parsedCurrent = currentGpa.trim() === "" ? null : Number.parseFloat(currentGpa);
+    const parsedTerm = currentTerm === "" ? null : Number.parseInt(currentTerm, 10);
 
     try {
       await saveProfile({
         major,
-        year,
-        target_gpa: Number.isNaN(parsedTarget) ? null : parsedTarget
+        current_semester: parsedTerm,
+        current_gpa: Number.isNaN(parsedCurrent) ? null : parsedCurrent,
+        target_gpa: Number.isNaN(parsedTarget) ? null : parsedTarget,
       });
-      showSuccess("Profile updated successfully", "Your dashboard will reflect these changes.");
+      showSuccess("Profile updated", "Your dashboard will reflect these changes.");
     } catch (err: any) {
       showError(
         "Failed to save changes",
@@ -111,17 +146,12 @@ export const ProfilePage = () => {
     );
   }
 
-  const userInitials = user?.first_name?.[0]?.toUpperCase() ||
-    user?.email?.[0]?.toUpperCase() ||
-    "U";
+  const userInitials =
+    user?.first_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "U";
 
   return (
     <PageShell>
-      <motion.div
-        initial="initial"
-        animate="animate"
-        variants={fadeInUp}
-      >
+      <motion.div initial="initial" animate="animate" variants={fadeInUp}>
         <PageSection>
           <header>
             <Heading level="h1">Profile</Heading>
@@ -130,7 +160,7 @@ export const ProfilePage = () => {
             </Text>
           </header>
 
-          {/* Profile Header Card - 8pt spacing (gap-4) */}
+          {/* Profile Header */}
           <Card variant="elevated">
             <div className="flex items-center gap-4">
               <Avatar text={userInitials} size="xl" />
@@ -145,15 +175,11 @@ export const ProfilePage = () => {
             </div>
           </Card>
 
-          {/* Stats Grid */}
+          {/* Stats */}
           <div className="grid gap-4 grid-cols-1 sm:gap-5 sm:grid-cols-3">
             <StatCard
               label="Current GPA"
-              value={
-                profile?.current_gpa != null
-                  ? profile.current_gpa.toFixed(2)
-                  : "—"
-              }
+              value={profile?.current_gpa != null ? Number(profile.current_gpa).toFixed(2) : "—"}
               icon={<TrendingUp className="h-4 w-4" />}
             />
             <StatCard
@@ -163,7 +189,7 @@ export const ProfilePage = () => {
             />
             <StatCard
               label="Year"
-              value={year || "Not set"}
+              value={yearDisplay}
               icon={<BookOpen className="h-4 w-4" />}
             />
           </div>
@@ -177,41 +203,93 @@ export const ProfilePage = () => {
             />
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-6">
-              <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
-            <Input
-              label="Major"
-              value={major}
-              onChange={(e) => setMajor(e.target.value)}
-              placeholder="e.g. Computer Science"
-            />
-            <Input
-              label="Year"
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
-              placeholder="e.g. 2nd year"
-            />
-            <Input
-              label="Target GPA"
-              value={targetGpa}
-              onChange={(e) => setTargetGpa(e.target.value)}
-              placeholder="e.g. 3.8"
-              type="number"
-              step="0.01"
-              min="0"
-              max="4"
-            />
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                {/* Major */}
+                <Select
+                  label="Major"
+                  name="major"
+                  value={major}
+                  onChange={(e) => handleMajorChange(e.target.value)}
+                >
+                  <option value="">Select major…</option>
+                  {FIXED_MAJORS.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                      {!availableMajors.includes(m) ? " (coming soon)" : ""}
+                    </option>
+                  ))}
+                </Select>
+
+                {/* Current Term — options driven by the selected major's curriculum */}
+                <Select
+                  label="Current Term"
+                  name="current_term"
+                  value={currentTerm}
+                  onChange={(e) => setCurrentTerm(e.target.value)}
+                  disabled={termOptions.length === 0}
+                >
+                  <option value="">
+                    {termOptions.length === 0 ? "Select major first…" : "Select term…"}
+                  </option>
+                  {termOptions.map((t) => (
+                    <option key={t.term_number} value={String(t.term_number)}>
+                      {t.label} — {t.season}, Year {t.year}
+                    </option>
+                  ))}
+                </Select>
+
+                {/* Current GPA */}
+                <Input
+                  label="Current GPA"
+                  value={currentGpa}
+                  onChange={(e) => setCurrentGpa(e.target.value)}
+                  placeholder="e.g. 3.2"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="4"
+                />
+
+                {/* Target GPA */}
+                <Input
+                  label="Target GPA"
+                  value={targetGpa}
+                  onChange={(e) => setTargetGpa(e.target.value)}
+                  placeholder="e.g. 3.8"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="4"
+                />
               </div>
 
               {profile?.study_style && (
-                <div className="rounded-xl border border-slate-800/60 bg-surface-base shadow-elevation-low backdrop-blur-sm p-4">
-                  <p className="text-xs font-semibold uppercase leading-tight tracking-wide text-slate-400 mb-2">
+                <div className="rounded-xl border border-slate-800/60 bg-surface-base p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
                     Study Style
                   </p>
                   <p className="text-sm leading-relaxed text-slate-200">{profile.study_style}</p>
                 </div>
               )}
 
-              <div className="flex items-center justify-end gap-4 pt-4 border-t border-slate-800/60">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-4 border-t border-slate-800/60">
+                <button
+                  type="button"
+                  onClick={() => setPlanModalOpen(true)}
+                  disabled={!canGeneratePlan}
+                  title={
+                    !hasCurriculum && major
+                      ? `Curriculum for ${major} is not available yet`
+                      : !canGeneratePlan
+                      ? "Set your major and current term first"
+                      : undefined
+                  }
+                  className="inline-flex items-center gap-2 rounded-xl border border-primary-500/40 bg-primary-500/10 px-4 py-2 text-sm font-medium text-primary-300 transition-all duration-quick hover:bg-primary-500/20 hover:text-primary-200 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                >
+                  <Sparkles className="h-4 w-4" aria-hidden="true" />
+                  Generate My Academic Plan
+                </button>
+
                 <Button type="submit" loading={saving} size="md">
                   Save Changes
                 </Button>
@@ -220,8 +298,15 @@ export const ProfilePage = () => {
           </Card>
         </PageSection>
       </motion.div>
+
+      <GeneratePlanModal
+        isOpen={planModalOpen}
+        onClose={() => setPlanModalOpen(false)}
+        initialMajor={major}
+        initialTerm={currentTerm ? Number(currentTerm) : undefined}
+        curricula={curricula}
+        availableMajors={availableMajors}
+      />
     </PageShell>
   );
 };
-
-

@@ -15,7 +15,7 @@ from planner.serializers import (
     CalendarEventSerializer,
     TaskSerializer,
 )
-from profiles.models import StudentProfile
+from profiles.models import GpaSnapshot, StudentProfile
 
 
 class DashboardOverviewView(APIView):
@@ -36,6 +36,7 @@ class DashboardOverviewView(APIView):
         # Profile / GPA
         profile = StudentProfile.objects.filter(user=user).first()
         current_gpa = float(profile.current_gpa) if profile and profile.current_gpa is not None else None
+        target_gpa = float(profile.target_gpa) if profile and profile.target_gpa is not None else None
 
         # Upcoming assignments (deadlines) — exclude completed ones
         upcoming_deadlines_qs = (
@@ -76,17 +77,20 @@ class DashboardOverviewView(APIView):
         )
         next_events = CalendarEventSerializer(next_events_qs, many=True).data
 
-        # GPA trend: last 8 weeks placeholder (use current_gpa if available; no history stored yet)
-        gpa_trend = []
-        if current_gpa is not None:
-            for i in range(8, 0, -1):
-                gpa_trend.append({
-                    "label": f"Week {9 - i}",
-                    "gpa": round(current_gpa, 2),
-                })
+        # GPA trend: use stored snapshots (recorded whenever the user saves their profile GPA)
+        snapshots = list(
+            GpaSnapshot.objects.filter(user=user)
+            .order_by("recorded_at")
+            .values_list("recorded_at", "gpa")
+        )
+        snapshots = snapshots[-8:]
+        if snapshots:
+            gpa_trend = [
+                {"label": f"Week {i + 1}", "gpa": round(float(gpa), 2)}
+                for i, (_, gpa) in enumerate(snapshots)
+            ]
         else:
-            for i in range(1, 9):
-                gpa_trend.append({"label": f"Week {i}", "gpa": 0})
+            gpa_trend = []
 
         # Weekly task stats: this week Mon–Sun, planned vs completed (by task due_at and status)
         week_start = now - timedelta(days=now.weekday())
@@ -127,6 +131,7 @@ class DashboardOverviewView(APIView):
 
         data = {
             "current_gpa": current_gpa,
+            "target_gpa": target_gpa,
             "upcoming_deadlines": upcoming_deadlines,
             "weekly_tasks": weekly_tasks,
             "study_time_this_week_hours": sum(s["hours"] for s in study_time_by_course) or 0,

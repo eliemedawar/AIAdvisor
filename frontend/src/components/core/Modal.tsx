@@ -109,7 +109,7 @@ export const Modal = ({
               ease: [0.4, 0, 0.2, 1]
             }}
             className={clsx(
-              "relative z-10 w-full rounded-2xl border border-slate-800/80",
+              "relative z-10 flex max-h-[90vh] w-full flex-col rounded-2xl border border-slate-800/80",
               "bg-surface-overlay shadow-elevation-overlay backdrop-blur-xl",
               sizeClasses[size],
               className
@@ -132,7 +132,7 @@ export const Modal = ({
             )}
 
             {/* Content */}
-            <div className="px-6 py-4">{children}</div>
+            <div className="flex-1 overflow-y-auto px-6 py-4">{children}</div>
 
             {/* Footer */}
             {footer && (

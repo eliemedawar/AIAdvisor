@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
-  BookOpen,
 } from "lucide-react";
 import {
   PageShell,
@@ -17,8 +16,6 @@ import {
   SectionHeader,
   StatCard,
   Badge,
-  EmptyState,
-  SkeletonCard,
   SkeletonList,
   Button,
 } from "../../components";
@@ -125,6 +122,7 @@ export const DashboardPage = () => {
 
   // Calculate metrics for stat cards
   const currentGpa = overview?.current_gpa;
+  const targetGpa = overview?.target_gpa ?? null;
   const gpaTrend = overview?.gpa_trend || [];
   const hasGpaTrend = gpaTrend.length >= 2;
   
@@ -169,9 +167,7 @@ export const DashboardPage = () => {
     .sort((a, b) => new Date(a.due_at!).getTime() - new Date(b.due_at!).getTime())
     .slice(0, 3);
 
-  // Identify at-risk courses (low study hours)
   const studyTimeByCourse = overview?.study_time_by_course || [];
-  const atRiskCourses = studyTimeByCourse.filter(c => c.hours < 5);
 
   return (
     <PageShell>
@@ -179,205 +175,120 @@ export const DashboardPage = () => {
         variants={staggerChildren}
         initial="initial"
         animate="animate"
+        className="space-y-6"
       >
-        <PageSection className="space-y-8 lg:space-y-10">
-          <header>
-            <Heading level="h1">Dashboard</Heading>
-            <Text variant="body" color="muted" className="mt-2">
-              Analytics-driven insights into your academic performance and priorities.
-            </Text>
-          </header>
+        {/* Header */}
+        <motion.header variants={fadeInUp}>
+          <Heading level="h1">Dashboard</Heading>
+          <Text variant="body" color="muted" className="mt-1">
+            Academic performance overview for this semester.
+          </Text>
+        </motion.header>
 
-          {/* TOP ROW - Key Stats */}
-          <motion.div
-            className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 lg:gap-6"
-            variants={fadeInUp}
-          >
-            <StatCard
-              label="Current GPA"
-              value={currentGpa != null ? currentGpa.toFixed(2) : "—"}
-              icon={gpaTrendDirection === "up" ? <TrendingUp className="h-4 w-4" /> : gpaTrendDirection === "down" ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
-              trend={gpaTrendDirection}
-              trendValue={gpaTrendValue || undefined}
-            />
-            <StatCard
-              label="Upcoming Deadlines"
-              value={upcomingDeadlines.length}
-              icon={<Calendar className="h-4 w-4" />}
-            />
-            <StatCard
-              label="Weekly Tasks"
-              value={weeklyTasksDisplay}
-              icon={<CheckCircle2 className="h-4 w-4" />}
-            />
-          </motion.div>
+        {/* Stats row */}
+        <motion.div
+          className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+          variants={fadeInUp}
+        >
+          <StatCard
+            label="Current GPA"
+            value={currentGpa != null ? currentGpa.toFixed(2) : "—"}
+            icon={gpaTrendDirection === "down" ? <TrendingDown className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
+            trend={gpaTrendDirection}
+            trendValue={gpaTrendValue || undefined}
+          />
+          <StatCard
+            label="Upcoming Deadlines"
+            value={upcomingDeadlines.length}
+            icon={<Calendar className="h-4 w-4" />}
+          />
+          <StatCard
+            label="Weekly Tasks"
+            value={weeklyTasksDisplay}
+            icon={<CheckCircle2 className="h-4 w-4" />}
+          />
+        </motion.div>
 
-          {/* MIDDLE - Charts and Trends */}
-          <section className="space-y-4">
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-              <SectionHeader
-                title="Performance pulse"
-                subtitle="GPA and task velocity stay aligned for healthier pacing."
-                small
-              />
-              <Text
-                variant="small"
-                className="rounded-xl border border-slate-800/60 bg-slate-950/60 px-4 py-2.5 text-slate-300 shadow-elevation-flat backdrop-blur-sm"
-              >
-                {buildAnalyticsInsight(gpaTrendDirection, gpaTrendValue, weeklyCompletionRate, totalPlanned)}
-              </Text>
-            </div>
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-              {/* Left - GPA Trend */}
-              <motion.div variants={fadeInUp} className="h-full">
-                <GpaTrendChart
-                  data={gpaTrend}
-                  currentGpa={currentGpa}
-                  className="h-full"
-                />
-              </motion.div>
+        {/* Insight bar */}
+        <motion.div variants={fadeInUp}>
+          <div className="flex items-center gap-3 rounded-xl border border-slate-800/60 bg-slate-950/60 px-4 py-3 text-xs backdrop-blur-sm">
+            <span className="shrink-0 font-semibold uppercase tracking-widest text-slate-500">This week</span>
+            <span className="h-3 w-px shrink-0 bg-slate-700/80" />
+            <span className="text-slate-300">
+              {buildAnalyticsInsight(gpaTrendDirection, gpaTrendValue, weeklyCompletionRate, totalPlanned)}
+            </span>
+          </div>
+        </motion.div>
 
-              {/* Right - Stacked Charts (1 column) */}
-              <motion.div variants={fadeInUp} className="space-y-5">
-                <WeeklyTasksChart data={weeklyTaskStats} className="min-h-[240px]" />
-                <StudyTimeByCourseChart data={studyTimeByCourse} className="min-h-[260px]" />
-              </motion.div>
-            </div>
-          </section>
+        {/* Main analytics grid: left wider, right narrower */}
+        <motion.div
+          variants={fadeInUp}
+          className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
+        >
+          {/* LEFT column: GPA trend + upcoming tasks */}
+          <div className="space-y-5">
+            <GpaTrendChart data={gpaTrend} currentGpa={currentGpa} targetGpa={targetGpa} />
 
-          {/* BOTTOM - Actionable Lists */}
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-6">
             {/* Next 3 Tasks */}
-            <motion.div variants={fadeInUp} className="h-full">
-              <Card variant="elevated" className="h-full">
-                <SectionHeader
-                  title="Next 3 Tasks"
-                  subtitle="Your immediate priorities"
-                  small
-                />
-                <div className="mt-4 space-y-3">
-                  {next3Tasks.length > 0 ? (
-                    next3Tasks.map((task, index) => (
-                      <motion.div
-                        key={`task-${task.id}`}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05, duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
-                        className="group flex items-center justify-between rounded-xl border border-slate-800/60 bg-surface-base px-4 py-3 shadow-elevation-low transition-all duration-quick ease-snappy hover:bg-surface-elevated hover:border-slate-700/80 hover:shadow-elevation-mid hover:-translate-y-0.5"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-500/10 text-primary-400 transition-colors group-hover:bg-primary-500/20">
-                            <Clock className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-slate-100">
-                              {task.title}
-                            </p>
-                            <p className="text-xs text-slate-400">
-                              Due{" "}
-                              {new Date(task.due_at!).toLocaleString(undefined, {
-                                month: "short",
-                                day: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit"
-                              })}
-                            </p>
-                          </div>
-                        </div>
-                        {"priority" in task && (
-                          <Badge
-                            variant={
-                              task.priority === "high"
-                                ? "danger"
-                                : task.priority === "medium"
-                                ? "warning"
-                                : "default"
-                            }
-                            size="sm"
-                          >
-                            {task.priority}
-                          </Badge>
-                        )}
-                      </motion.div>
-                    ))
-                  ) : (
-                    <EmptyState
-                      icon={<CheckCircle2 className="h-8 w-8" />}
-                      title="No upcoming tasks"
-                      description="You're all caught up. Plan your next focus items to stay proactive."
-                      action={
-                        <Button
+            <Card variant="elevated" padding="md">
+              <SectionHeader title="Upcoming Tasks" subtitle="Your next 3 priorities" small />
+              <div className="mt-3 space-y-2">
+                {next3Tasks.length > 0 ? (
+                  next3Tasks.map((task, index) => (
+                    <motion.div
+                      key={`task-${task.id}`}
+                      initial={{ opacity: 0, x: -8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05, duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
+                      className="group flex items-center gap-3 rounded-xl border border-slate-800/60 bg-surface-base px-3 py-2.5 shadow-elevation-low transition-all duration-quick ease-snappy hover:border-slate-700/80 hover:bg-surface-elevated hover:-translate-y-0.5"
+                    >
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-400 transition-colors group-hover:bg-primary-500/20">
+                        <Clock className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-slate-100">{task.title}</p>
+                        <p className="text-xs text-slate-400">
+                          Due{" "}
+                          {new Date(task.due_at!).toLocaleString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                      {"priority" in task && (
+                        <Badge
+                          variant={task.priority === "high" ? "danger" : task.priority === "medium" ? "warning" : "default"}
                           size="sm"
-                          variant="primary"
-                          onClick={() => navigate("/calendar")}
                         >
-                          Plan tasks
-                        </Button>
-                      }
-                    />
-                  )}
-                </div>
-              </Card>
-            </motion.div>
-
-            {/* At-Risk Courses */}
-            <motion.div variants={fadeInUp} className="h-full">
-              <Card variant="elevated" className="h-full">
-                <SectionHeader
-                  title="At-Risk Courses"
-                  subtitle="Courses needing more attention"
-                  small
-                />
-                <div className="mt-4 space-y-3">
-                  {atRiskCourses.length > 0 ? (
-                    atRiskCourses.map((course, index) => (
-                      <motion.div
-                        key={`course-${index}`}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05, duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
-                        className="group flex items-center justify-between rounded-xl border border-warning-500/30 bg-warning-500/5 px-4 py-3 shadow-elevation-low transition-all duration-quick ease-snappy hover:bg-warning-500/10 hover:border-warning-500/50 hover:shadow-elevation-mid hover:-translate-y-0.5"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning-500/10 text-warning-400">
-                            <AlertCircle className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium text-slate-100">
-                              {course.courseName}
-                            </p>
-                            <p className="text-xs text-slate-400">
-                              Only {course.hours}h study time this week
-                            </p>
-                          </div>
-                        </div>
-                        <Badge variant="warning" size="sm">
-                          Plan study
+                          {task.priority}
                         </Badge>
-                      </motion.div>
-                    ))
-                  ) : (
-                    <EmptyState
-                      icon={<BookOpen className="h-8 w-8" />}
-                      title="All courses on track"
-                      description="Your study time is well distributed across every course this week."
-                      action={
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => navigate("/calendar")}
-                        >
-                          Review schedule
-                        </Button>
-                      }
-                    />
-                  )}
-                </div>
-              </Card>
-            </motion.div>
+                      )}
+                    </motion.div>
+                  ))
+                ) : (
+                  <div className="flex items-center gap-3 rounded-xl border border-slate-800/50 bg-slate-950/30 px-3 py-3">
+                    <CheckCircle2 className="h-5 w-5 shrink-0 text-success-400" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-slate-300">All caught up!</p>
+                      <p className="text-xs text-slate-500">No upcoming tasks right now.</p>
+                    </div>
+                    <Button size="sm" variant="ghost" onClick={() => navigate("/calendar")}>
+                      Plan tasks
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </Card>
           </div>
 
-        </PageSection>
+          {/* RIGHT column: weekly tasks chart + study time chart */}
+          <div className="space-y-5">
+            <WeeklyTasksChart data={weeklyTaskStats} />
+            <StudyTimeByCourseChart data={studyTimeByCourse} />
+          </div>
+        </motion.div>
       </motion.div>
     </PageShell>
   );

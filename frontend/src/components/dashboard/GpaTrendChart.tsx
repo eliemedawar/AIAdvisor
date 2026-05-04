@@ -1,5 +1,14 @@
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ReferenceLine,
+  ResponsiveContainer,
+} from "recharts";
+import { TrendingUp, TrendingDown, Minus, Target } from "lucide-react";
 import { Card, SectionHeader, Text, EmptyState, Button } from "../index";
 import { GpaTrendPoint } from "../../api/dashboardApi";
 import { primary, accent } from "../../styles/design-tokens";
@@ -7,6 +16,7 @@ import { primary, accent } from "../../styles/design-tokens";
 const chartColors = {
   line: primary[400],
   dot: accent[400],
+  target: "#f59e0b",
   grid: "rgba(148, 163, 184, 0.12)",
   axis: "#94a3b8",
 };
@@ -30,33 +40,24 @@ const GpaTooltip = ({ active, payload, label }: any) => {
 interface GpaTrendChartProps {
   data: GpaTrendPoint[];
   currentGpa: number | null;
+  targetGpa?: number | null;
   className?: string;
 }
 
-/**
- * GpaTrendChart - Line chart showing GPA trend over time
- * 
- * Displays GPA progression with insights and trend analysis.
- * Uses dark theme-aligned Recharts styling.
- */
-export const GpaTrendChart = ({ data, currentGpa, className }: GpaTrendChartProps) => {
-  // Calculate insights
+export const GpaTrendChart = ({ data, currentGpa, targetGpa, className }: GpaTrendChartProps) => {
   const hasData = data && data.length > 0;
-  
+
   if (!hasData) {
     return (
       <Card variant="elevated" padding="md" className={className}>
-        <SectionHeader
-          title="GPA Trend"
-          subtitle="Track your academic performance over time"
-          small
-        />
-        <div className="mt-4">
+        <SectionHeader title="GPA Trend" subtitle="Track your academic performance over time" small />
+        <div className="mt-3">
           <EmptyState
+            compact
             icon={<TrendingUp className="h-8 w-8" />}
             title="No GPA data yet"
-            description="Connect your courses and grades to start tracking your GPA trends."
-            action={<Button size="sm" variant="primary">Add Courses</Button>}
+            description="Save your GPA on the Profile page to start tracking your trend."
+            action={<Button size="sm" variant="primary" onClick={() => window.location.href = "/profile"}>Go to Profile</Button>}
           />
         </div>
       </Card>
@@ -67,61 +68,61 @@ export const GpaTrendChart = ({ data, currentGpa, className }: GpaTrendChartProp
   const lastGpa = data[data.length - 1]?.gpa || 0;
   const delta = lastGpa - firstGpa;
   const deltaAbs = Math.abs(delta);
-  const deltaFormatted = delta >= 0 ? `+${deltaAbs.toFixed(2)}` : `-${deltaAbs.toFixed(2)}`;
 
-  // Determine trend
+  // Trend direction
   let trendIcon = <Minus className="h-4 w-4" />;
-  let trendText = "stable";
   let trendColor = "text-slate-400";
+  let insightMessage: string;
 
-  if (delta > 0.1) {
+  if (data.length === 1) {
+    insightMessage = `Your GPA is ${lastGpa.toFixed(2)}.${targetGpa != null ? ` Target: ${targetGpa.toFixed(2)}.` : ""}`;
+  } else if (delta > 0.1) {
     trendIcon = <TrendingUp className="h-4 w-4" />;
-    trendText = "up";
     trendColor = "text-success-400";
+    insightMessage = `GPA up +${deltaAbs.toFixed(2)} over the last ${data.length} saves. Keep it up!`;
   } else if (delta < -0.1) {
     trendIcon = <TrendingDown className="h-4 w-4" />;
-    trendText = "down";
     trendColor = "text-danger-400";
+    insightMessage = `GPA down ${deltaAbs.toFixed(2)}. Consider reaching out for support.`;
+  } else {
+    insightMessage = `GPA has been stable over the last ${data.length} saves.`;
   }
 
-  // Generate insight message
-  const insightMessage = 
-    delta > 0.1
-      ? `Your GPA is ${trendText} ${deltaFormatted} over this period. Great progress!`
-      : delta < -0.1
-      ? `Your GPA has decreased by ${deltaAbs.toFixed(2)}. Consider reaching out for academic support.`
-      : `Your GPA has been ${trendText} over the last ${data.length} weeks.`;
+  // Gap to target
+  const gapToTarget = targetGpa != null ? targetGpa - lastGpa : null;
 
-  // Calculate Y-axis domain with padding
-  const minGpa = Math.min(...data.map(d => d.gpa));
-  const maxGpa = Math.max(...data.map(d => d.gpa));
-  const padding = 0.2;
-  const yMin = Math.max(0, minGpa - padding);
-  const yMax = Math.min(4.0, maxGpa + padding);
+  // Y-axis domain: include target GPA if set
+  const gpas = data.map((d) => d.gpa);
+  if (targetGpa != null) gpas.push(targetGpa);
+  const padding = 0.25;
+  const yMin = Math.max(0, Math.min(...gpas) - padding);
+  const yMax = Math.min(4.0, Math.max(...gpas) + padding);
 
   const chartData = data.map((point, index) => {
     const prev = index === 0 ? point.gpa : data[index - 1].gpa;
-    const deltaPoint = point.gpa - prev;
-    const descriptor =
-      deltaPoint > 0.05
-        ? `↗︎ ${deltaPoint.toFixed(2)} vs prior`
-        : deltaPoint < -0.05
-        ? `↘︎ ${Math.abs(deltaPoint).toFixed(2)} vs prior`
-        : "Flat vs prior";
-    return { ...point, trend: descriptor };
+    const d = point.gpa - prev;
+    const trend =
+      d > 0.05 ? `↗︎ +${d.toFixed(2)} vs prior` : d < -0.05 ? `↘︎ ${d.toFixed(2)} vs prior` : "Flat vs prior";
+    return { ...point, trend };
   });
+
+  const subtitle = data.length === 1 ? "1 data point" : `Last ${data.length} saves`;
 
   return (
     <Card variant="elevated" padding="md" className={className}>
-      <SectionHeader
-        title="GPA Trend"
-        subtitle={`Last ${data.length} weeks`}
-        small
-      />
-      
-      <div className="mt-6">
-        <ResponsiveContainer width="100%" height={276}>
-          <LineChart data={chartData} margin={{ top: 5, right: 12, left: -12, bottom: 5 }}>
+      <div className="flex items-start justify-between gap-2">
+        <SectionHeader title="GPA Trend" subtitle={subtitle} small />
+        {targetGpa != null && (
+          <div className="flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 shrink-0">
+            <Target className="h-3.5 w-3.5 text-amber-400" />
+            <span className="text-xs font-semibold text-amber-300">Target {targetGpa.toFixed(2)}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4">
+        <ResponsiveContainer width="100%" height={210}>
+          <LineChart data={chartData} margin={{ top: 8, right: 12, left: -12, bottom: 5 }}>
             <defs>
               <linearGradient id="gpaGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor={chartColors.line} stopOpacity={0.25} />
@@ -146,13 +147,28 @@ export const GpaTrendChart = ({ data, currentGpa, className }: GpaTrendChartProp
               stroke={chartColors.axis}
               style={{ fontSize: "0.6875rem", fontFamily: "Inter", fontWeight: 400 }}
               tick={{ fill: chartColors.axis }}
-              ticks={[0, 1.0, 2.0, 3.0, 4.0].filter(t => t >= yMin && t <= yMax)}
+              ticks={[0, 1.0, 2.0, 3.0, 4.0].filter((t) => t >= yMin && t <= yMax)}
               width={32}
             />
             <Tooltip
               content={<GpaTooltip />}
               cursor={{ stroke: chartColors.line, strokeOpacity: 0.2, strokeWidth: 2 }}
             />
+            {targetGpa != null && (
+              <ReferenceLine
+                y={targetGpa}
+                stroke={chartColors.target}
+                strokeDasharray="5 4"
+                strokeWidth={1.5}
+                label={{
+                  value: `Target ${targetGpa.toFixed(2)}`,
+                  position: "insideTopRight",
+                  fill: chartColors.target,
+                  fontSize: 10,
+                  fontWeight: 600,
+                }}
+              />
+            )}
             <Line
               type="monotone"
               dataKey="gpa"
@@ -169,25 +185,39 @@ export const GpaTrendChart = ({ data, currentGpa, className }: GpaTrendChartProp
         </ResponsiveContainer>
       </div>
 
-      {/* Insight Text */}
-      <div className="mt-4 flex items-start gap-3 rounded-xl border border-slate-800/60 bg-slate-950/40 p-4">
-        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${trendColor.replace('text-', 'bg-').replace('-400', '-500/10')}`}>
-          <span className={trendColor}>
-            {trendIcon}
-          </span>
-        </div>
-        <div>
-          <Text variant="small" className="text-slate-100 font-medium">
+      {/* Insight + gap-to-target */}
+      <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-slate-800/60 bg-slate-950/40 px-3 py-2.5">
+        <span
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${trendColor
+            .replace("text-", "bg-")
+            .replace("-400", "-500/10")}`}
+        >
+          <span className={trendColor}>{trendIcon}</span>
+        </span>
+        <div className="min-w-0 flex-1">
+          <Text variant="small" className="text-slate-100 font-medium leading-snug">
             {insightMessage}
           </Text>
-          {currentGpa != null && (
-            <Text variant="small" color="muted" className="mt-1">
-              Current GPA: <span className="font-semibold text-slate-200">{currentGpa.toFixed(2)}</span>
-            </Text>
-          )}
+          <div className="flex flex-wrap gap-x-3 mt-0.5">
+            {currentGpa != null && (
+              <Text variant="small" color="muted" className="leading-snug">
+                Current: <span className="font-semibold text-slate-200">{Number(currentGpa).toFixed(2)}</span>
+              </Text>
+            )}
+            {gapToTarget != null && (
+              <Text variant="small" color="muted" className="leading-snug">
+                {gapToTarget > 0 ? (
+                  <>Gap to target: <span className="font-semibold text-amber-300">+{gapToTarget.toFixed(2)} needed</span></>
+                ) : gapToTarget < 0 ? (
+                  <>Target exceeded by <span className="font-semibold text-success-400">{Math.abs(gapToTarget).toFixed(2)}</span></>
+                ) : (
+                  <>Target <span className="font-semibold text-success-400">reached!</span></>
+                )}
+              </Text>
+            )}
+          </div>
         </div>
       </div>
     </Card>
   );
 };
-
